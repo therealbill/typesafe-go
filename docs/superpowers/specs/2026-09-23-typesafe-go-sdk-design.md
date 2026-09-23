@@ -22,7 +22,8 @@ Source of truth: https://docs.typesafe.ai (`api.md`, `models.md`, and the
 
 - `POST https://api.typesafe.ai/v1/systemone` with `Authorization: Bearer <key>`.
   Body: `{"state": string|object|array, "model": string, "questions": {id: Question}}`.
-- `GET /v1/models` returns `{"models": [{"name", "description", "release_date"}]}`.
+- `GET /v1/models` returns `{"models": [{"name", "description", "release_date"}]}`;
+  `release_date` is an RFC 3339 timestamp, kept as a string.
 - Question types: `noul` (instructions, optional `criteria.true/false`),
   `choice` (instructions, `criteria` map of 1–255 labels to descriptions or
   null), `score` (instructions, `criteria` ordered array of 2–10 levels).
@@ -33,7 +34,10 @@ Source of truth: https://docs.typesafe.ai (`api.md`, `models.md`, and the
   Response also carries `model`, `usage.input_tokens`, `usage.output_tokens`,
   and header `x-typesafe-request-id`.
 - Errors: 400, 401, 403, 404, 422, 429 (with `Retry-After` / `retry-after-ms`),
-  5xx including 529 overloaded.
+  5xx including 529 overloaded. Observed error bodies all use a top-level
+  `detail` field whose value is a string (`{"detail":"Not Found"}`), an object
+  (`{"detail":{"error_type":"authentication_error","message":"..."}}`), or a
+  pydantic-style array of `{type, loc, msg, input}` items on 422.
 - Models: `jev-1.13.0`; aliases `jev-latest`, `jev-preview`. Context 64k tokens.
 - Python SDK defaults: base URL `https://api.typesafe.ai`, model `jev-latest`,
   per-operation timeout 10s, retries 2, backoff 0.5s→5s with 0.25 jitter,
@@ -45,7 +49,7 @@ Source of truth: https://docs.typesafe.ai (`api.md`, `models.md`, and the
 
 ```
 typesafe-go/
-  go.mod                   module github.com/therealbill/typesafe-go (go 1.22)
+  go.mod                   module github.com/therealbill/typesafe-go (go 1.25)
   doc.go                   package documentation
   client.go                Client, NewClient, Option, SystemOne, ListModels
   question.go              Question, Noul, Choice, Score, RawQuestion, JSONContent, validation
@@ -59,7 +63,8 @@ typesafe-go/
   instrument.go            Instrumentation hook interface
   otel/                    OTel implementation of the hook (separate deps)
   internal/version/        Version string
-  cmd/jev/                 Cobra CLI
+  cmd/jev/                 main.go only
+  internal/cli/            Cobra commands, exit codes, telemetry wiring (testable in-process)
   tools/selfreview/        Jev-driven review of spec vs. implementation vs. tests
   docs/                    Diátaxis documentation
   docs/superpowers/specs/  this document
@@ -68,8 +73,9 @@ typesafe-go/
 ```
 
 Dependency policy: the root package `typesafe` imports only the standard
-library. `typesafe/otel` imports the OpenTelemetry API, `otelhttp`, and
-`semconv`. `cmd/jev` imports Cobra, `typesafe/otel`, and
+library. `typesafe/otel` imports the OpenTelemetry API and `otelhttp`; GenAI
+attribute names are defined as constants in the package because the Go
+`semconv` packages do not ship them. `cmd/jev` imports Cobra, `typesafe/otel`, and
 `go.opentelemetry.io/contrib/otelconf/x` for exporter setup. All three are
 one Go module.
 
@@ -181,7 +187,7 @@ type APIError struct {
     RequestID string
 }
 func (e *APIError) Error() string
-func (e *APIError) Message() string   // text from a JSON body's "message"/"error"/"detail" field, else body prefix
+func (e *APIError) Message() string   // text from `detail` (string, object, or array), else "message"/"error", else body prefix
 
 type RateLimitError struct{ APIError; RetryAfter time.Duration }  // status 429
 type ConnectionError struct{ Err error }                          // wraps; Unwrap()
@@ -401,7 +407,9 @@ explicitly accepted with a note in the report.
 
 ## Tooling and release
 
-Go 1.22 minimum in `go.mod` (development on 1.24). `golangci-lint` with a
+Go 1.25 minimum in `go.mod`: the stable OpenTelemetry line (otel v1.46.0,
+contrib v0.71.0, otelconf v0.26.0) requires it. Local development on an older
+toolchain works through `GOTOOLCHAIN=auto`. `golangci-lint` with a
 small config, `govulncheck`, Makefile targets `test`, `lint`, `build`,
 `integration`, `selfreview`, `docs`. GitHub Actions: `ci.yml` runs test and lint on push and
 PR; `release.yml` on a `v*` tag runs goreleaser to build `jev` for
