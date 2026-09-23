@@ -1018,7 +1018,10 @@ func IsRetryable(err error) bool {
 ```go
 package typesafe
 
-import "net/http"
+import (
+	"errors"
+	"net/http"
+)
 
 // RetryPolicy is defined fully in Task 5.
 type RetryPolicy struct{ MaxRetries int }
@@ -1027,15 +1030,15 @@ func DefaultRetryPolicy() RetryPolicy { return RetryPolicy{MaxRetries: 2} }
 
 func (p RetryPolicy) retryable(_ *http.Response, err error) bool {
 	var api *APIError
-	if errorsAs(err, &api) {
+	if errors.As(err, &api) {
 		return api.Status == 408 || api.Status == 429 || api.Status >= 500
 	}
 	var ce *ConnectionError
-	return errorsAs(err, &ce)
+	return errors.As(err, &ce)
 }
 ```
 
-and in `errors.go` add `func errorsAs(err error, target any) bool { return errors.As(err, target) }`. Task 5 removes both.
+Task 5 replaces this file.
 
 - [ ] **Step 4: Run tests to verify they pass**
 
@@ -1570,7 +1573,6 @@ git commit -m "Add response decoding, answer types, and models list"
 **Files:**
 - Replace: `retry.go`
 - Create: `retry_test.go`
-- Modify: `errors.go` (delete the temporary `errorsAs` helper)
 
 - [ ] **Step 1: Write the failing tests `retry_test.go`**
 
@@ -1878,22 +1880,18 @@ func parseRetryAfter(h http.Header, now time.Time) (time.Duration, bool) {
 }
 ```
 
-- [ ] **Step 4: Remove the temporary helper from `errors.go`**
-
-Delete the `errorsAs` function added in Task 3. Nothing else in `errors.go` changes.
-
-- [ ] **Step 5: Run tests to verify they pass**
+- [ ] **Step 4: Run tests to verify they pass**
 
 ```bash
 go test -run 'TestDefaultRetryPolicy|TestRetry|TestIsRetryable' -v . 2>&1 | tail -12
 ```
 Expected: all PASS.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
 gofmt -l . ; go vet ./... && go test ./...
-git add retry.go retry_test.go errors.go
+git add retry.go retry_test.go
 git commit -m "Add retry policy with exponential backoff and Retry-After support"
 ```
 
@@ -3220,7 +3218,6 @@ package otel
 
 import (
 	"context"
-	"errors"
 	"strings"
 	"testing"
 
@@ -3319,7 +3316,6 @@ func TestSpanOnError(t *testing.T) {
 	if len(s.Events) == 0 || s.Events[0].Name != "exception" {
 		t.Fatal("error should be recorded as an exception event")
 	}
-	_ = errors.New
 }
 
 func TestRecordContentOptIn(t *testing.T) {
@@ -3692,7 +3688,7 @@ Expected: all PASS.
 **Agent:** `cli` (starts after Task 1 is committed)
 
 **Files:**
-- Create: `Makefile`, `.golangci.yml`, `.gitignore`, `.goreleaser.yaml`, `.github/workflows/ci.yml`, `.github/workflows/release.yml`
+- Create: `Makefile`, `.golangci.yml`, `.gitignore`, `.goreleaser.yaml`, `.github/workflows/ci.yml`, `.github/workflows/release.yml`, `tools/checkdocs.sh`
 
 - [ ] **Step 1: Write `.gitignore`**
 
@@ -3773,28 +3769,29 @@ Indentation under each target must be a real tab.
 
 ```bash
 #!/usr/bin/env bash
-# Verifies that every markdown page under docs/ (excluding superpowers/) is
-# linked from README.md or another docs page, and that every relative link in
-# README.md and docs/ resolves to a file.
+# Checks that every page under docs/ (excluding docs/superpowers/) is linked
+# from README.md or another docs page, and that every relative markdown link
+# in README.md and docs/ resolves to an existing file.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 status=0
-pages=$(find docs -name '*.md' -not -path 'docs/superpowers/*' | sort)
-for page in $pages; do
-  if ! grep -rq --include='*.md' -F "$(basename "$page")" README.md docs; then
+while IFS= read -r page; do
+  name=$(basename "$page")
+  if ! grep -rq --include='*.md' -F "$name" README.md docs; then
     echo "unlinked: $page"; status=1
   fi
-done
-while IFS= read -r line; do
-  file=${line%%:*}; link=${line#*:}
-  link=${link%%#*}
-  [ -z "$link" ] && continue
-  case "$link" in http*|mailto*) continue;; esac
-  target="$(dirname "$file")/$link"
-  if [ ! -e "$target" ]; then
-    echo "broken link in $file: $link"; status=1
-  fi
-done < <(grep -rhoE --include='*.md' '\]\(([^)]+)\)' README.md docs 2>/dev/null | sed -E 's/\]\((.*)\)/\1/' | while read -r l; do grep -rlF --include='*.md' "]($l)" README.md docs | sed "s|$|:$l|"; done)
+done < <(find docs -name '*.md' -not -path 'docs/superpowers/*' | sort)
+while IFS= read -r file; do
+  dir=$(dirname "$file")
+  while IFS= read -r link; do
+    link=${link%%#*}
+    [ -z "$link" ] && continue
+    case "$link" in http://*|https://*|mailto:*) continue;; esac
+    if [ ! -e "$dir/$link" ]; then
+      echo "broken link in $file: $link"; status=1
+    fi
+  done < <(grep -oE '\]\([^)]+\)' "$file" | sed -E 's/^\]\((.*)\)$/\1/' || true)
+done < <({ echo README.md; find docs -name '*.md' -not -path 'docs/superpowers/*'; } | sort)
 exit $status
 ```
 
@@ -6128,9 +6125,9 @@ Expected: no `undocumented:` lines.
 
 > Write two learning-oriented tutorials. Each must be runnable top to bottom by someone who has never used TypeSafe, with a checkpoint after each step showing expected output. Front matter: `title`, `description`, `type: tutorial`. Run every command yourself before writing its expected output (`TYPESAFE_API_KEY` is set). No "Authored by" lines.
 >
-> `first-judgment-in-go.md` (about 20 minutes): create a module, `go get github.com/therealbill/typesafe-go`, set the key, write a `main.go` that sends a support ticket as state with one Noul, one Choice, and one Score (use the spec's fixture questions), print the three answers, then extend it with `SystemOneAs` into a struct, then add `errors.As` handling for `*typesafe.APIError`. Show the actual JSON the API returned.
+> `first-judgment-in-go.md`: create a module, `go get github.com/therealbill/typesafe-go`, set the key, write a `main.go` that sends a support ticket as state with one Noul, one Choice, and one Score (use the spec's fixture questions), print the three answers, then extend it with `SystemOneAs` into a struct, then add `errors.As` handling for `*typesafe.APIError`. Show the actual JSON the API returned.
 >
-> `jev-from-the-command-line.md` (about 10 minutes): build with `make build`, run `jev version`, `jev models --pretty`, one `jev ask` in flag mode, the same request in JSON mode from a file, read the exit code with `echo $?`, and provoke an auth error with a bad key to show the error JSON and exit code 3.
+> `jev-from-the-command-line.md`: build with `make build`, run `jev version`, `jev models --pretty`, one `jev ask` in flag mode, the same request in JSON mode from a file, read the exit code with `echo $?`, and provoke an auth error with a bad key to show the error JSON and exit code 3.
 
 - [ ] **Step 2: Commit**
 
@@ -6177,7 +6174,7 @@ git commit -m "Add how-to guides"
 
 - [ ] **Step 1: Write `README.md`**
 
-```markdown
+````markdown
 # typesafe-go
 
 Go client for the [TypeSafe](https://typesafe.ai) System One API, plus the `jev` command-line tool. Ask Jev typed questions about a piece of state and get back probabilities, choices, and scores your code can act on.
@@ -6230,7 +6227,7 @@ echo '{"state":"...","questions":{"billing":{"type":"noul","instructions":"Is th
 ## License
 
 MIT
-```
+````
 
 Also create `LICENSE` with the MIT text and the copyright line `Copyright (c) 2026 Bill Anderson`.
 
