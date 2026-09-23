@@ -60,6 +60,7 @@ typesafe-go/
   otel/                    OTel implementation of the hook (separate deps)
   internal/version/        Version string
   cmd/jev/                 Cobra CLI
+  tools/selfreview/        Jev-driven review of spec vs. implementation vs. tests
   docs/                    Diátaxis documentation
   docs/superpowers/specs/  this document
   .github/workflows/       ci.yml, release.yml
@@ -362,11 +363,47 @@ Standard `testing` package only.
 - Live integration: skipped unless `TYPESAFE_API_KEY` is set; one `SystemOne`
   with one question of each type and one `ListModels`.
 
+## Self-review with Jev
+
+Once `jev` works, the repository uses it to judge its own implementation and
+tests against this spec. Jev returns typed judgments, not explanations, so the
+tool asks many narrow questions and escalates the doubtful ones.
+
+Layout: `tools/selfreview/` holds a Go driver (`main.go`, run via
+`make selfreview`) and `questions/*.json` templates. The driver requires
+`TYPESAFE_API_KEY` and invokes `jev ask` in JSON mode over stdin, so it is
+also the end-to-end exercise of the input mode the plugin will use.
+
+Units: `units.json` lists triples of spec section heading, implementation
+file(s), and test file(s). One request per unit with state
+`{"spec": "...", "implementation": "...", "tests": "..."}` and questions:
+
+- Noul per behavior named in the spec section, generated from a per-section
+  list in the template: "Do the tests exercise `<behavior>`?"
+- Noul: "Does the implementation contradict the spec section?"
+- Score on test thoroughness with concrete levels (0: no tests for this
+  section; 1: happy path only; 2: happy path plus the error cases the spec
+  names; 3: also concurrency, cancellation, and boundary values the spec
+  names).
+- Choice of the weakest area from a fixed set: `validation`, `error_mapping`,
+  `retry`, `decoding`, `logging`, `none`.
+
+Output: `selfreview-report.json` and a Markdown summary on stdout. Thresholds
+(defaults, overridable by flag): a behavior Noul below 0.6, a contradiction
+Noul above 0.4, or a thoroughness Score below 2.0 flags the unit. Flagged
+units are listed with the exact failing question so a reviewer, human or
+agent, gets a specific claim to check rather than a general request.
+
+The implementation plan ends with a phase that runs the self-review over
+every unit, sends flagged items to a code-review pass, fixes what that pass
+confirms, and reruns until nothing is flagged or remaining flags are
+explicitly accepted with a note in the report.
+
 ## Tooling and release
 
 Go 1.22 minimum in `go.mod` (development on 1.24). `golangci-lint` with a
 small config, `govulncheck`, Makefile targets `test`, `lint`, `build`,
-`integration`, `docs`. GitHub Actions: `ci.yml` runs test and lint on push and
+`integration`, `selfreview`, `docs`. GitHub Actions: `ci.yml` runs test and lint on push and
 PR; `release.yml` on a `v*` tag runs goreleaser to build `jev` for
 darwin/linux × amd64/arm64 and attach binaries to the GitHub release.
 
