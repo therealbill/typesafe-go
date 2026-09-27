@@ -150,3 +150,50 @@ func TestMessageTruncationIsRuneSafe(t *testing.T) {
 		t.Fatalf("expected 66 whole runes in 200 bytes, got %d", n)
 	}
 }
+
+func TestMessageIsAlwaysValidUTF8(t *testing.T) {
+	// A hostile or broken server can send bytes that are not UTF-8 at all.
+	// Message() is printed and logged, so it must never carry them through.
+	for _, body := range []string{
+		"\xff\xfe broken",
+		`{"detail":"` + "\xff\xfe" + `"}`,
+		"\xed\xa0\x80",
+		strings.Repeat("\xff", 300),
+	} {
+		got := (&APIError{Status: 500, Body: []byte(body)}).Message()
+		if !utf8.ValidString(got) {
+			t.Fatalf("Message() returned invalid UTF-8 for %q: %q", body, got)
+		}
+		if len(got) > maxMessageLen+3 {
+			t.Fatalf("message is %d bytes", len(got))
+		}
+	}
+}
+
+func FuzzAPIErrorMessage(f *testing.F) {
+	for _, seed := range []string{
+		`{"detail":{"error_type":"authentication_error","message":"Cannot authenticate with the server. Please check your API key and try again."}}`,
+		`{"detail":[{"type":"too_short","loc":["body","questions"],"msg":"Dictionary should have at least 1 item after validation, not 0","input":{},"ctx":{"field_type":"Dictionary","min_length":1,"actual_length":0}}]}`,
+		`{"detail":{"error_type":"api_usage_error","message":"Invalid request."}}`,
+		`{"detail":"Not Found"}`,
+		"",
+		"{",
+		strings.Repeat("x", 1024),
+	} {
+		f.Add(seed)
+	}
+	f.Fuzz(func(t *testing.T, body string) {
+		e := &APIError{Status: 500, Endpoint: "POST /v1/systemone", Body: []byte(body)}
+		got := e.Message()
+		if len(got) > maxMessageLen+3 {
+			t.Fatalf("message is %d bytes for input of %d: %q", len(got), len(body), got)
+		}
+		if !utf8.ValidString(got) {
+			t.Fatalf("message is not valid UTF-8 for %q: %q", body, got)
+		}
+		// Error() embeds Message(), so it must stay printable too.
+		if !utf8.ValidString(e.Error()) {
+			t.Fatalf("Error() is not valid UTF-8 for %q", body)
+		}
+	})
+}

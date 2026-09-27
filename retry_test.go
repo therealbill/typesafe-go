@@ -142,19 +142,40 @@ func TestRetryableDecisions(t *testing.T) {
 	}
 }
 
+// A server-requested wait follows one rule, the same for both headers:
+//
+//   - garbage, meaning unparseable, negative, or non-finite, is ignored and
+//     the client falls back to its own backoff;
+//   - any parsed non-negative wait, however large, is clamped to
+//     MaxRetryAfter, with the overflow guard applied before any multiplication
+//     so no value saturates or wraps into a nonsense delay.
 func TestRetryDelayRejectsUnusableRetryAfter(t *testing.T) {
 	p := DefaultRetryPolicy()
 	p.Jitter = 0
 	now := time.Date(2026, 9, 23, 12, 0, 0, 0, time.UTC)
-	// A value that is not a finite, non-negative number of seconds must be
-	// ignored in favour of the normal backoff. Saturating it into a Duration
-	// would overflow the retry budget check and block the call.
-	for _, v := range []string{"inf", "Inf", "NaN", "1e300", "-5", "1_0", "1e3", "3.5", "99999999999999999999"} {
-		t.Run(v, func(t *testing.T) {
+	garbage := []struct{ header, value string }{
+		{"Retry-After", "inf"},
+		{"Retry-After", "Inf"},
+		{"Retry-After", "NaN"},
+		{"Retry-After", "1e300"},
+		{"Retry-After", "1e3"},
+		{"Retry-After", "3.5"},
+		{"Retry-After", "-5"},
+		{"Retry-After", "1_0"},
+		{"Retry-After", "99999999999999999999"},
+		{"Retry-After", "later"},
+		{"retry-after-ms", "abc"},
+		{"retry-after-ms", "-1"},
+		{"retry-after-ms", "1.5"},
+		{"retry-after-ms", "inf"},
+		{"retry-after-ms", "99999999999999999999"},
+	}
+	for _, c := range garbage {
+		t.Run(c.header+"="+c.value, func(t *testing.T) {
 			h := http.Header{}
-			h.Set("Retry-After", v)
+			h.Set(c.header, c.value)
 			if got := p.delay(0, h, now, 0); got != 500*time.Millisecond {
-				t.Fatalf("Retry-After %q should fall back to backoff, got %s", v, got)
+				t.Fatalf("%s %q should fall back to backoff, got %s", c.header, c.value, got)
 			}
 		})
 	}
@@ -164,28 +185,56 @@ func TestRetryDelayCapsServerRequestedWait(t *testing.T) {
 	p := DefaultRetryPolicy()
 	p.Jitter = 0
 	now := time.Date(2026, 9, 23, 12, 0, 0, 0, time.UTC)
+	cases := []struct {
+		header, value string
+		want          time.Duration
+		why           string
+	}{
+		{"Retry-After", "60", time.Minute, "under the cap, honored unchanged"},
+		{"Retry-After", "600", 5 * time.Minute, "over the cap, clamped"},
+		{"Retry-After", "99999999999", 5 * time.Minute, "too large for a Duration, clamped"},
+		{"retry-after-ms", "1500", 1500 * time.Millisecond, "under the cap, honored unchanged"},
+		{"retry-after-ms", "600000", 5 * time.Minute, "over the cap, clamped"},
+		{"retry-after-ms", "999999999999999", 5 * time.Minute, "too large for a Duration, clamped"},
+	}
+	for _, c := range cases {
+		t.Run(c.header+"="+c.value, func(t *testing.T) {
+			h := http.Header{}
+			h.Set(c.header, c.value)
+			if got := p.delay(0, h, now, 0); got != c.want {
+				t.Fatalf("%s %q (%s): got %s want %s", c.header, c.value, c.why, got, c.want)
+			}
+		})
+	}
 
+	// The cap also applies to an HTTP date far in the future.
 	h := http.Header{}
-	h.Set("retry-after-ms", "999999999999999")
-	if got := p.delay(0, h, now, 0); got != p.MaxRetryAfter {
-		t.Fatalf("a retry-after-ms that overflows a Duration should clamp to MaxRetryAfter, got %s", got)
-	}
-
-	h = http.Header{}
-	h.Set("Retry-After", "600")
+	h.Set("Retry-After", now.AddDate(1, 0, 0).Format(http.TimeFormat))
 	if got := p.delay(0, h, now, 0); got != 5*time.Minute {
-		t.Fatalf("600s should clamp to the 5m default cap, got %s", got)
+		t.Fatalf("a far-future date should clamp, got %s", got)
 	}
+}
 
-	h = http.Header{}
-	h.Set("Retry-After", "60")
-	if got := p.delay(0, h, now, 0); got != time.Minute {
-		t.Fatalf("a wait under the cap must be honored unchanged, got %s", got)
+func FuzzParseRetryAfter(f *testing.F) {
+	for _, seed := range []string{"3", "0", "inf", "NaN", "1e300", "-5", "1_0", "Wed, 21 Oct 2026 07:28:00 GMT", ""} {
+		f.Add(seed)
 	}
-
-	h = http.Header{}
-	h.Set("Retry-After", "99999999999")
-	if got := p.delay(0, h, now, 0); got != p.MaxRetryAfter {
-		t.Fatalf("a delta-seconds value too large for a Duration should clamp, got %s", got)
-	}
+	p := DefaultRetryPolicy()
+	now := time.Date(2026, 9, 23, 12, 0, 0, 0, time.UTC)
+	f.Fuzz(func(t *testing.T, v string) {
+		h := http.Header{}
+		h.Set("Retry-After", v)
+		h.Set("retry-after-ms", v)
+		d, ok := parseRetryAfter(h, now)
+		if ok && d < 0 {
+			t.Fatalf("a usable wait must not be negative: %q gave %s", v, d)
+		}
+		// Whatever the header says, the delay handed to the retry loop is a
+		// sane, non-negative duration no larger than the cap. That is the
+		// invariant the budget arithmetic depends on.
+		got := p.delay(0, h, now, 0)
+		if got < 0 || got > p.MaxRetryAfter {
+			t.Fatalf("delay out of range for %q: %s", v, got)
+		}
+	})
 }

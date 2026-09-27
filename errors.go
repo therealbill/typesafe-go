@@ -79,11 +79,13 @@ func (e *APIError) Message() string {
 	if msg == "" {
 		msg = strings.TrimSpace(string(e.Body))
 	}
-	return truncate(msg, maxMessageLen)
+	// The body is whatever the server sent, so coerce it to valid UTF-8
+	// before it reaches a log or a terminal.
+	return truncate(strings.ToValidUTF8(msg, "\uFFFD"), maxMessageLen)
 }
 
 // truncate shortens s to at most n bytes without splitting a rune, marking the
-// cut when one was made.
+// cut when one was made. It assumes s is already valid UTF-8.
 func truncate(s string, n int) string {
 	if len(s) <= n {
 		return s
