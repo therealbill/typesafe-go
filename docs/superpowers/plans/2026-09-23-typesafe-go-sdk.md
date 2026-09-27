@@ -6075,7 +6075,7 @@ git commit -m "Add Jev-driven self-review tool"
 **Files:**
 - Create: `docs/explanation/why-the-core-is-stdlib-only.md`, `docs/explanation/retries-and-budgets.md`, `docs/explanation/why-content-is-not-traced-by-default.md`, `docs/explanation/mapping-from-the-python-sdk.md`
 
-- [ ] **Step 1: Dispatch `diataxis-docs:doc-explanation-writer`** with this brief, once per page:
+- [x] **Step 1: Dispatch `diataxis-docs:doc-explanation-writer`** with this brief, once per page:
 
 > Write `<path>` as a Diátaxis explanation page (understanding-oriented, no step-by-step instructions, no exhaustive reference). Source of truth: `docs/superpowers/specs/2026-09-23-typesafe-go-sdk-design.md`. Front matter: `title`, `description`, `type: explanation`. Length 400–900 words. Link to related reference and how-to pages by relative path even if they do not exist yet (they are listed in the spec's Documentation section). No "Authored by" lines.
 >
@@ -6084,7 +6084,7 @@ git commit -m "Add Jev-driven self-review tool"
 > - `why-content-is-not-traced-by-default.md`: state is often customer data; span attributes are retained and searchable; the opt-ins WithRecordContent and WithRecordAnswers and their truncation; what is always recorded (model, counts, usage, request ID, status).
 > - `mapping-from-the-python-sdk.md`: expand the spec's mapping table into prose: sync vs async, response_model vs SystemOneAs, status-specific exception classes vs APIError.Status plus RateLimitError, identical env var names, logging differences.
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add docs/explanation
@@ -6100,11 +6100,11 @@ git commit -m "Add explanation docs"
 **Files:**
 - Create: `docs/reference/client-options-and-environment.md`, `docs/reference/question-types.md`, `docs/reference/response-types.md`, `docs/reference/errors-and-exit-codes.md`, `docs/reference/jev-cli.md`, `docs/reference/span-attributes.md`
 
-- [ ] **Step 1: Dispatch `diataxis-docs:doc-reference-gen`** with this brief:
+- [x] **Step 1: Dispatch `diataxis-docs:doc-reference-gen`** with this brief:
 
 > Generate the six reference pages listed above from the source code in `/Users/bill/Projects/gojev`, not from the spec. Run `go doc -all github.com/therealbill/typesafe-go`, `go doc -all github.com/therealbill/typesafe-go/otel`, and `go run ./cmd/jev ask --help`, `models --help`, `--help` to collect signatures, defaults, flags, and help text. Reference pages state facts only: no advice, no tutorials. Front matter: `title`, `description`, `type: reference`. Tables for options, env vars, flags, exit codes, and attributes. Every exported identifier in the two packages must appear on exactly one page. The exit-code table must match the constants in `internal/cli/exit.go`. The span attribute table must match the constants in `otel/otel.go`. No "Authored by" lines.
 
-- [ ] **Step 2: Verify completeness and commit**
+- [x] **Step 2: Verify completeness and commit**
 
 ```bash
 for sym in $(go doc -all . | grep -oE '^(func|type) [A-Z][A-Za-z0-9]*' | awk '{print $2}' | sort -u); do grep -rq "$sym" docs/reference || echo "undocumented: $sym"; done
@@ -6122,7 +6122,7 @@ Expected: no `undocumented:` lines.
 **Files:**
 - Create: `docs/tutorials/first-judgment-in-go.md`, `docs/tutorials/jev-from-the-command-line.md`
 
-- [ ] **Step 1: Dispatch `diataxis-docs:doc-tutorial-writer`** with this brief:
+- [x] **Step 1: Dispatch `diataxis-docs:doc-tutorial-writer`** with this brief:
 
 > Write two learning-oriented tutorials. Each must be runnable top to bottom by someone who has never used TypeSafe, with a checkpoint after each step showing expected output. Front matter: `title`, `description`, `type: tutorial`. Run every command yourself before writing its expected output (`TYPESAFE_API_KEY` is set). No "Authored by" lines.
 >
@@ -6130,7 +6130,7 @@ Expected: no `undocumented:` lines.
 >
 > `jev-from-the-command-line.md`: build with `make build`, run `jev version`, `jev models --pretty`, one `jev ask` in flag mode, the same request in JSON mode from a file, read the exit code with `echo $?`, and provoke an auth error with a bad key to show the error JSON and exit code 3.
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add docs/tutorials
@@ -6146,7 +6146,7 @@ git commit -m "Add tutorials"
 **Files:**
 - Create: `docs/how-to/handle-rate-limits-and-retries.md`, `docs/how-to/decode-answers-into-your-own-struct.md`, `docs/how-to/trace-calls-and-send-to-honeycomb.md`, `docs/how-to/call-through-a-gateway.md`, `docs/how-to/drive-jev-from-a-script-or-agent.md`
 
-- [ ] **Step 1: Dispatch `diataxis-docs:doc-howto-writer`** with this brief:
+- [x] **Step 1: Dispatch `diataxis-docs:doc-howto-writer`** with this brief:
 
 > Write five goal-oriented how-to guides, each under 1200 words, numbered steps, assuming the reader has done the tutorials. Front matter: `title`, `description`, `type: how-to`. Compile every Go snippet (`go vet` on a scratch file) and run every shell command before writing expected output. No "Authored by" lines.
 >
@@ -6156,7 +6156,7 @@ git commit -m "Add tutorials"
 > - `call-through-a-gateway.md`: `WithBaseURL` and `TYPESAFE_BASE_URL`, `WithHeaders` for gateway auth, `WithHTTPClient` for proxies and custom TLS, `WithExtraBody` for gateway-specific fields.
 > - `drive-jev-from-a-script-or-agent.md`: this is the contract the future plugin relies on: the stdin JSON shape, the stdout response shape, the error JSON shape, the full exit-code table, `--raw`, `--pretty`, and a bash example that branches on `$?`. Include a `jq` one-liner extracting a choice.
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add docs/how-to
@@ -6173,7 +6173,7 @@ git commit -m "Add how-to guides"
 - Create: `README.md`
 - Modify: `docs/explanation/*.md` if the code diverged from the spec
 
-- [ ] **Step 1: Write `README.md`**
+- [x] **Step 1: Write `README.md`**
 
 ````markdown
 # typesafe-go
@@ -6232,11 +6232,11 @@ MIT
 
 Also create `LICENSE` with the MIT text and the copyright line `Copyright (c) 2026 Bill Anderson`.
 
-- [ ] **Step 2: Refresh explanation pages against the code**
+- [x] **Step 2: Refresh explanation pages against the code**
 
 Dispatch `diataxis-docs:doc-explanation-writer` to re-read the four explanation pages against the actual source and fix any claim that no longer matches (for example if a default or type name changed during implementation).
 
-- [ ] **Step 3: Validate and commit**
+- [x] **Step 3: Validate and commit**
 
 ```bash
 make docs
@@ -6288,7 +6288,7 @@ Note: `selfreview-report.json` is gitignored; only `units.json` will be staged. 
 
 **Agent:** lead
 
-- [ ] **Step 1: Full gate**
+- [x] **Step 1: Full gate**
 
 ```bash
 make lint && make test && make vuln && make build && make integration && make docs
@@ -6296,10 +6296,10 @@ git status --short
 ```
 Expected: every target passes, working tree clean.
 
-- [ ] **Step 2: Code review**
+- [x] **Step 2: Code review**
 
 Invoke `superpowers:requesting-code-review` and dispatch `superpowers:code-reviewer` with the spec path, the plan path, and `git log --oneline` as context. Route each finding to the owning agent; agents fix by explicit-path commits. Re-run Step 1 after fixes.
 
-- [ ] **Step 3: Tag**
+- [x] **Step 3: Tag**
 
 Do not tag or push unless the user asks. Report: commit count, test summary, self-review table, and anything accepted rather than fixed.
