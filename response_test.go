@@ -142,3 +142,24 @@ func TestDecodeModels(t *testing.T) {
 		t.Fatal("expected error")
 	}
 }
+
+func TestDecodeDefaultsMissingMaps(t *testing.T) {
+	res, err := decodeSystemOne([]byte(`{"model":"m","answers":{"tone":{"type":"choice","choice":"angry","confidence":1},"urgency":{"type":"score","score":1.5,"confidence":0.5}}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := res.Choices()["tone"]
+	if c.Probabilities == nil {
+		t.Fatal("a choice answer without probabilities must decode to an empty non-nil map")
+	}
+	if len(c.Probabilities) != 0 {
+		t.Fatalf("probabilities should be empty, got %v", c.Probabilities)
+	}
+	s := res.Scores()["urgency"]
+	if s.Legend == nil || s.Probabilities == nil {
+		t.Fatalf("a score answer without legend or probabilities must decode to empty non-nil maps, got legend=%v probabilities=%v", s.Legend, s.Probabilities)
+	}
+	if len(s.Legend) != 0 || len(s.Probabilities) != 0 {
+		t.Fatalf("legend and probabilities should be empty, got legend=%v probabilities=%v", s.Legend, s.Probabilities)
+	}
+}

@@ -51,3 +51,29 @@ func TestSystemOneAsPropagatesRequestErrors(t *testing.T) {
 		t.Fatalf("err %v full %v", err, full)
 	}
 }
+
+func TestSystemOneAsMissingKeyIsZero(t *testing.T) {
+	type partial struct {
+		Billing NoulAnswer   `json:"billing"`
+		Absent  NoulAnswer   `json:"absent"`
+		AbsentP *ScoreAnswer `json:"absent_pointer"`
+	}
+	fs := newFakeServer(t, okStep(t))
+	c := newTestClient(t, fs.URL)
+	got, full, err := SystemOneAs[partial](context.Background(), c, fixtureState, fixtureQuestions)
+	if err != nil {
+		t.Fatalf("a key absent from the answers must not be an error: %v", err)
+	}
+	if full == nil {
+		t.Fatal("full response should be returned")
+	}
+	if got.Billing.Noul != 0.99 {
+		t.Fatalf("present field should still decode, got %+v", got.Billing)
+	}
+	if got.Absent != (NoulAnswer{}) {
+		t.Fatalf("absent value field should stay at its zero value, got %+v", got.Absent)
+	}
+	if got.AbsentP != nil {
+		t.Fatalf("absent pointer field should stay nil, got %+v", got.AbsentP)
+	}
+}

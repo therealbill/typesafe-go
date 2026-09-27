@@ -93,6 +93,18 @@ func TestRetryDelayHonorsRetryAfter(t *testing.T) {
 	if got := p.delay(0, h, now, 0); got != 500*time.Millisecond {
 		t.Fatalf("unparseable header falls back to backoff, got %s", got)
 	}
+	h = http.Header{}
+	h.Set("retry-after-ms", "1500")
+	h.Set("Retry-After", "3")
+	if got := p.delay(0, h, now, 0); got != 1500*time.Millisecond {
+		t.Fatalf("retry-after-ms must win over Retry-After, got %s", got)
+	}
+	h = http.Header{}
+	h.Set("retry-after-ms", "garbage")
+	h.Set("Retry-After", "3")
+	if got := p.delay(0, h, now, 0); got != 3*time.Second {
+		t.Fatalf("unparseable retry-after-ms should fall back to Retry-After, got %s", got)
+	}
 	p.HonorRetryAfter = false
 	h = http.Header{}
 	h.Set("Retry-After", "3")
