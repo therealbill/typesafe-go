@@ -512,3 +512,24 @@ func TestClientConcurrentUse(t *testing.T) {
 	}
 	wg.Wait()
 }
+
+func TestSystemOneNonFiniteRetryAfterDoesNotHang(t *testing.T) {
+	fs := newFakeServer(t, step{status: 503, body: `down`, headers: map[string]string{"Retry-After": "inf"}})
+	p := fastPolicy()
+	p.Budget = 50 * time.Millisecond
+	c := newTestClient(t, fs.URL, WithRetryPolicy(p))
+	done := make(chan error, 1)
+	go func() {
+		_, err := c.SystemOne(context.Background(), fixtureState, fixtureQuestions)
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		var api *APIError
+		if !errors.As(err, &api) || api.Status != 503 {
+			t.Fatalf("err %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("SystemOne did not return within 2s: a non-finite Retry-After hung the retry loop")
+	}
+}

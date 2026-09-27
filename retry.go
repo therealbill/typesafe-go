@@ -2,6 +2,7 @@ package typesafe
 
 import (
 	"errors"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -29,6 +30,8 @@ type RetryPolicy struct {
 	RetryOnTimeout bool
 	// HonorRetryAfter uses Retry-After and retry-after-ms headers as the delay. Default true.
 	HonorRetryAfter bool
+	// MaxRetryAfter caps a server-requested wait from Retry-After or retry-after-ms. Default 5m.
+	MaxRetryAfter time.Duration
 	// ShouldRetry, when set, replaces every other decision. resp may be nil.
 	ShouldRetry func(resp *http.Response, err error) bool
 }
@@ -46,6 +49,7 @@ func DefaultRetryPolicy() RetryPolicy {
 		RetryOnConnErr:  true,
 		RetryOnTimeout:  true,
 		HonorRetryAfter: true,
+		MaxRetryAfter:   5 * time.Minute,
 	}
 }
 
@@ -75,6 +79,9 @@ func (p RetryPolicy) normalized() RetryPolicy {
 	}
 	if p.Jitter > 1 {
 		p.Jitter = 1
+	}
+	if p.MaxRetryAfter <= 0 {
+		p.MaxRetryAfter = d.MaxRetryAfter
 	}
 	if p.RetryStatuses == nil {
 		p.RetryStatuses = d.RetryStatuses
@@ -116,6 +123,9 @@ func (p RetryPolicy) retryable(resp *http.Response, err error) bool {
 func (p RetryPolicy) delay(retry int, hdr http.Header, now time.Time, random float64) time.Duration {
 	if p.HonorRetryAfter && hdr != nil {
 		if d, ok := parseRetryAfter(hdr, now); ok {
+			if p.MaxRetryAfter > 0 && d > p.MaxRetryAfter {
+				d = p.MaxRetryAfter
+			}
 			return d
 		}
 	}
@@ -132,11 +142,25 @@ func (p RetryPolicy) delay(retry int, hdr http.Header, now time.Time, random flo
 	return d
 }
 
+// maxRetryAfterMillis is the largest retry-after-ms value that fits in a
+// time.Duration without overflowing.
+const maxRetryAfterMillis = int64(math.MaxInt64) / int64(time.Millisecond)
+
 // parseRetryAfter reads retry-after-ms (milliseconds) or Retry-After
 // (seconds or an HTTP date). It returns false when neither is usable.
+//
+// A value that cannot be represented as a time.Duration is never converted
+// directly: saturating or wrapping it would produce a nonsense delay that
+// overflows the caller's budget arithmetic. A wait too large to represent is
+// reported as the maximum Duration so the caller clamps it to MaxRetryAfter,
+// while a wait that is not a finite, non-negative number of seconds is
+// reported as unusable so the caller falls back to its own backoff.
 func parseRetryAfter(h http.Header, now time.Time) (time.Duration, bool) {
 	if v := strings.TrimSpace(h.Get("retry-after-ms")); v != "" {
 		if ms, err := strconv.ParseInt(v, 10, 64); err == nil && ms >= 0 {
+			if ms > maxRetryAfterMillis {
+				return time.Duration(math.MaxInt64), true
+			}
 			return time.Duration(ms) * time.Millisecond, true
 		}
 	}
@@ -145,10 +169,10 @@ func parseRetryAfter(h http.Header, now time.Time) (time.Duration, bool) {
 		return 0, false
 	}
 	if secs, err := strconv.ParseFloat(v, 64); err == nil {
-		if secs < 0 {
-			secs = 0
+		ns := secs * float64(time.Second)
+		if !math.IsNaN(ns) && !math.IsInf(ns, 0) && ns >= 0 && ns <= float64(math.MaxInt64) {
+			return time.Duration(ns), true
 		}
-		return time.Duration(secs * float64(time.Second)), true
 	}
 	if t, err := http.ParseTime(v); err == nil {
 		d := t.Sub(now)

@@ -15,6 +15,9 @@ func TestDefaultRetryPolicy(t *testing.T) {
 	if !p.RetryOnConnErr || !p.RetryOnTimeout || !p.HonorRetryAfter {
 		t.Fatal("boolean defaults should be true")
 	}
+	if p.MaxRetryAfter != 5*time.Minute {
+		t.Fatalf("MaxRetryAfter default should be 5m, got %s", p.MaxRetryAfter)
+	}
 	for _, s := range []int{408, 429, 500, 529, 599} {
 		if !p.retryableStatus(s) {
 			t.Errorf("%d should be retryable", s)
@@ -136,5 +139,47 @@ func TestRetryableDecisions(t *testing.T) {
 	p.ShouldRetry = func(resp *http.Response, err error) bool { calls++; return true }
 	if !p.retryable(nil, &APIError{Status: 422}) || calls != 1 {
 		t.Fatal("ShouldRetry must override everything")
+	}
+}
+
+func TestRetryDelayRejectsUnusableRetryAfter(t *testing.T) {
+	p := DefaultRetryPolicy()
+	p.Jitter = 0
+	now := time.Date(2026, 9, 23, 12, 0, 0, 0, time.UTC)
+	// A value that is not a finite, non-negative number of seconds must be
+	// ignored in favour of the normal backoff. Saturating it into a Duration
+	// would overflow the retry budget check and block the call.
+	for _, v := range []string{"inf", "Inf", "NaN", "1e300", "-5"} {
+		t.Run(v, func(t *testing.T) {
+			h := http.Header{}
+			h.Set("Retry-After", v)
+			if got := p.delay(0, h, now, 0); got != 500*time.Millisecond {
+				t.Fatalf("Retry-After %q should fall back to backoff, got %s", v, got)
+			}
+		})
+	}
+}
+
+func TestRetryDelayCapsServerRequestedWait(t *testing.T) {
+	p := DefaultRetryPolicy()
+	p.Jitter = 0
+	now := time.Date(2026, 9, 23, 12, 0, 0, 0, time.UTC)
+
+	h := http.Header{}
+	h.Set("retry-after-ms", "999999999999999")
+	if got := p.delay(0, h, now, 0); got != p.MaxRetryAfter {
+		t.Fatalf("a retry-after-ms that overflows a Duration should clamp to MaxRetryAfter, got %s", got)
+	}
+
+	h = http.Header{}
+	h.Set("Retry-After", "600")
+	if got := p.delay(0, h, now, 0); got != 5*time.Minute {
+		t.Fatalf("600s should clamp to the 5m default cap, got %s", got)
+	}
+
+	h = http.Header{}
+	h.Set("Retry-After", "60")
+	if got := p.delay(0, h, now, 0); got != time.Minute {
+		t.Fatalf("a wait under the cap must be honored unchanged, got %s", got)
 	}
 }

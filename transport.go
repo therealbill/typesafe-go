@@ -44,7 +44,7 @@ func (c *Client) send(ctx context.Context, method, path string, body []byte, ext
 			hdr = resp.Header
 		}
 		delay := policy.delay(retry, hdr, time.Now(), c.random())
-		if policy.Budget > 0 && time.Since(start)+delay > policy.Budget {
+		if policy.Budget > 0 && delay > policy.Budget-time.Since(start) {
 			c.logger.Warn("typesafe retry budget exhausted", "endpoint", endpoint, "attempt", retry+1, "error", err)
 			return resp, respBody, retry + 1, err
 		}
