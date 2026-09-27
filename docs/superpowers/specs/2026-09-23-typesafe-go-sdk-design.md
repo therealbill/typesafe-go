@@ -336,16 +336,19 @@ Exit codes:
 | Code | Meaning |
 |---|---|
 | 0 | success |
-| 1 | usage error, bad flags, unreadable or invalid request JSON |
+| 1 | usage error, bad flags, unreadable or invalid request JSON, missing API key (`kind` `usage`); or an unclassified internal error (`kind` `internal`) |
 | 2 | client-side validation failure (`*ValidationError`) |
 | 3 | 401 or 403 |
 | 4 | 400, 404, 422 |
 | 5 | 429 after retries exhausted |
 | 6 | 5xx (including 529) after retries exhausted, or a 2xx body that failed decoding (`kind` `invalid_response`) |
-| 7 | connection error or timeout |
+| 7 | connection error or per-attempt timeout, including a caller context deadline |
+| 130 | interrupted by Ctrl-C or SIGTERM while a request was in flight (`kind` `interrupted`) |
 
-On error: one line on stderr, and on stdout a JSON object
-`{"error": {"status", "request_id", "message", "kind"}}`.
+On error, including flag and command errors from the argument parser: one
+line on stderr with control characters escaped, and on stdout a JSON object
+`{"error": {"status", "request_id", "message", "kind"}}`. Inbound JSON and
+state files are capped at 16 MiB.
 
 Telemetry: the CLI initializes the OTel SDK via `otelconf.NewSDK()` when
 `--trace` is set or when `HONEYCOMB_API_KEY`, `OTEL_EXPORTER_OTLP_ENDPOINT`,
