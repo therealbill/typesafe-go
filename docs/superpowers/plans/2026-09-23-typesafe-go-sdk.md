@@ -254,7 +254,7 @@ Expected: no gofmt output, no vet errors, clean build.
 - Create: `errors.go` (only `ValidationError`, the rest comes in Task 3)
 - Modify: `response.go` (delete the temporary `Question` and `Questions` placeholders added in Task 1 so `instrument.go` compiled; Task 4 replaces the file)
 
-- [ ] **Step 1: Write `errors.go` with just `ValidationError`**
+- [x] **Step 1: Write `errors.go` with just `ValidationError`**
 
 ```go
 package typesafe
@@ -276,7 +276,7 @@ func (e *ValidationError) Error() string {
 func (e *ValidationError) Unwrap() error { return e.Err }
 ```
 
-- [ ] **Step 2: Write the failing tests `question_test.go`**
+- [x] **Step 2: Write the failing tests `question_test.go`**
 
 ```go
 package typesafe
@@ -415,14 +415,14 @@ func TestValidateContentState(t *testing.T) {
 }
 ```
 
-- [ ] **Step 3: Run tests to verify they fail**
+- [x] **Step 3: Run tests to verify they fail**
 
 ```bash
 go test ./... 2>&1 | head -5
 ```
 Expected: compile errors naming `Noul`, `validateQuestions`, and friends as undefined.
 
-- [ ] **Step 4: Write `question.go`**
+- [x] **Step 4: Write `question.go`**
 
 ```go
 package typesafe
@@ -657,14 +657,14 @@ func validateContent(path string, v any, optional bool) error {
 }
 ```
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 ```bash
 go test -run 'TestQuestion|TestValidate' -v . 2>&1 | tail -15
 ```
 Expected: all `--- PASS`, ending `ok  github.com/therealbill/typesafe-go`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 gofmt -l . ; go vet ./... && go test ./...
@@ -681,7 +681,7 @@ git commit -m "Add question types with wire marshaling and validation"
 - Modify: `errors.go` (replace whole file)
 - Create: `errors_test.go`
 
-- [ ] **Step 1: Write the failing tests `errors_test.go`**
+- [x] **Step 1: Write the failing tests `errors_test.go`**
 
 ```go
 package typesafe
@@ -817,14 +817,14 @@ func TestAPIErrorHeadersNil(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 ```bash
 go test -run 'TestAPIError|TestRateLimit|TestIsAuth|TestTimeoutError|TestIsRetryable|TestResponseValidation' . 2>&1 | head -5
 ```
 Expected: compile errors for `APIError`, `RateLimitError`, and friends.
 
-- [ ] **Step 3: Replace `errors.go`**
+- [x] **Step 3: Replace `errors.go`**
 
 ```go
 package typesafe
@@ -1041,14 +1041,14 @@ func (p RetryPolicy) retryable(_ *http.Response, err error) bool {
 
 Task 5 replaces this file.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 ```bash
 go test -run 'TestAPIError|TestRateLimit|TestIsAuth|TestTimeoutError|TestIsRetryable|TestResponseValidation' -v . 2>&1 | tail -12
 ```
 Expected: all PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 gofmt -l . ; go vet ./... && go test ./...
@@ -1066,11 +1066,11 @@ git commit -m "Add API, connection, timeout, and validation error types"
 - Replace: `response.go`
 - Create: `response_test.go`, `models.go`, `testdata/request.json`, `testdata/systemone_ok.json`, `testdata/models_ok.json`
 
-- [ ] **Step 1: Write the fixtures**
+- [x] **Step 1: Write the fixtures**
 
 Create `testdata/request.json`, `testdata/systemone_ok.json`, and `testdata/models_ok.json` with the exact contents from the Fixtures section at the top of this plan, one line each, no trailing whitespace changes.
 
-- [ ] **Step 2: Write the failing tests `response_test.go`**
+- [x] **Step 2: Write the failing tests `response_test.go`**
 
 ```go
 package typesafe
@@ -1219,14 +1219,14 @@ func TestDecodeModels(t *testing.T) {
 }
 ```
 
-- [ ] **Step 3: Run tests to verify they fail**
+- [x] **Step 3: Run tests to verify they fail**
 
 ```bash
 go test -run 'TestDecode|TestAnswer' . 2>&1 | head -5
 ```
 Expected: compile errors for `decodeSystemOne`, `NoulAnswer`, and friends.
 
-- [ ] **Step 4: Replace `response.go`**
+- [x] **Step 4: Replace `response.go`**
 
 ```go
 package typesafe
@@ -1520,7 +1520,7 @@ func (a *ScoreAnswer) UnmarshalJSON(b []byte) error {
 }
 ```
 
-- [ ] **Step 5: Write `models.go`**
+- [x] **Step 5: Write `models.go`**
 
 ```go
 package typesafe
@@ -1551,14 +1551,14 @@ func decodeModels(body []byte) (*ListModelsResponse, error) {
 }
 ```
 
-- [ ] **Step 6: Run tests to verify they pass**
+- [x] **Step 6: Run tests to verify they pass**
 
 ```bash
 go test -run 'TestDecode|TestAnswer' -v . 2>&1 | tail -15
 ```
 Expected: all PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 gofmt -l . ; go vet ./... && go test ./...
@@ -1575,7 +1575,7 @@ git commit -m "Add response decoding, answer types, and models list"
 - Replace: `retry.go`
 - Create: `retry_test.go`
 
-- [ ] **Step 1: Write the failing tests `retry_test.go`**
+- [x] **Step 1: Write the failing tests `retry_test.go`**
 
 ```go
 package typesafe
@@ -1708,14 +1708,14 @@ func TestRetryableDecisions(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 ```bash
 go test -run 'TestDefaultRetryPolicy|TestRetry' . 2>&1 | head -5
 ```
 Expected: compile errors for `InitialDelay`, `delay`, `normalized`.
 
-- [ ] **Step 3: Replace `retry.go`**
+- [x] **Step 3: Replace `retry.go`**
 
 ```go
 package typesafe
@@ -1881,14 +1881,14 @@ func parseRetryAfter(h http.Header, now time.Time) (time.Duration, bool) {
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 ```bash
 go test -run 'TestDefaultRetryPolicy|TestRetry|TestIsRetryable' -v . 2>&1 | tail -12
 ```
 Expected: all PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 gofmt -l . ; go vet ./... && go test ./...
@@ -1907,7 +1907,7 @@ git commit -m "Add retry policy with exponential backoff and Retry-After support
 
 This task has no tests of its own; Task 7's fake-server tests cover it. It is split out so the file stays focused.
 
-- [ ] **Step 1: Write `transport.go`**
+- [x] **Step 1: Write `transport.go`**
 
 ```go
 package typesafe
@@ -2060,7 +2060,7 @@ func sleep(ctx context.Context, d time.Duration) error {
 }
 ```
 
-- [ ] **Step 2: Build**
+- [x] **Step 2: Build**
 
 ```bash
 go build ./... 2>&1 | head
@@ -2076,7 +2076,7 @@ Expected: errors only about `c.logger`, `c.random`, `c.httpClient`, `c.baseURL`,
 - Create: `client.go`, `client_test.go`
 - Commit also: `transport.go` from Task 6
 
-- [ ] **Step 1: Write the failing tests `client_test.go`**
+- [x] **Step 1: Write the failing tests `client_test.go`**
 
 ```go
 package typesafe
@@ -2595,14 +2595,14 @@ func TestClientConcurrentUse(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 ```bash
 go test -run 'TestSystemOne|TestListModels|TestNewClient|TestInstrumentation|TestWithHTTPClient|TestLogging|TestNewLogger|TestClientConcurrent' . 2>&1 | head -5
 ```
 Expected: compile errors for `NewClient`, `WithAPIKey`, and friends.
 
-- [ ] **Step 3: Write `client.go`**
+- [x] **Step 3: Write `client.go`**
 
 ```go
 package typesafe
@@ -2962,14 +2962,14 @@ func countQuestions(qs Questions) (total, nouls, choices, scores int) {
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 ```bash
 go test -race ./... 2>&1 | tail -5
 ```
 Expected: `ok  github.com/therealbill/typesafe-go` with no race reports. If `TestSystemOneTimeout` is flaky on a loaded machine, raise the server delay to 500ms; do not loosen the assertion.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 gofmt -l . ; go vet ./... && go test -race ./...
@@ -2985,7 +2985,7 @@ git commit -m "Add client with options, retries, and fake-server tests"
 **Files:**
 - Create: `typed.go`, `typed_test.go`
 
-- [ ] **Step 1: Write the failing tests `typed_test.go`**
+- [x] **Step 1: Write the failing tests `typed_test.go`**
 
 ```go
 package typesafe
@@ -3043,14 +3043,14 @@ func TestSystemOneAsPropagatesRequestErrors(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 ```bash
 go test -run TestSystemOneAs . 2>&1 | head -3
 ```
 Expected: `undefined: SystemOneAs`.
 
-- [ ] **Step 3: Write `typed.go`**
+- [x] **Step 3: Write `typed.go`**
 
 ```go
 package typesafe
@@ -3096,14 +3096,14 @@ func SystemOneAs[T any](ctx context.Context, c *Client, state any, questions Que
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 ```bash
 go test -run TestSystemOneAs -v . 2>&1 | tail -6
 ```
 Expected: three PASS lines.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 gofmt -l . ; go vet ./... && go test ./...
@@ -3120,7 +3120,7 @@ git commit -m "Add SystemOneAs generic typed decoding"
 **Files:**
 - Create: `integration_test.go`
 
-- [ ] **Step 1: Write `integration_test.go`**
+- [x] **Step 1: Write `integration_test.go`**
 
 ```go
 package typesafe
@@ -3178,14 +3178,14 @@ func TestIntegrationLive(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run it live**
+- [x] **Step 2: Run it live**
 
 ```bash
 go test -run Integration -v . 2>&1 | tail -5
 ```
 Expected: `--- PASS: TestIntegrationLive`. If the tone answer differs from `angry`, report the actual answer to the lead rather than editing the assertion.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add integration_test.go
