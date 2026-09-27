@@ -35,8 +35,8 @@ Output: {"model": ..., "answers": {...}, "usage": {...}, "request_id": ...}`,
 	f.StringVarP(&o.file, "file", "f", "", "request JSON file; '-' or omitted reads stdin")
 	f.StringVar(&o.state, "state", "", "state text, @path to read a file, or '-' for stdin")
 	f.StringArrayVar(&o.nouls, "noul", nil, "key=instructions (repeatable)")
-	f.StringArrayVar(&o.choices, "choice", nil, "key=instructions:label1,label2,... (repeatable)")
-	f.StringArrayVar(&o.scores, "score", nil, "key=instructions:level0|level1|... (repeatable)")
+	f.StringArrayVar(&o.choices, "choice", nil, "key=instructions:label1,label2,... (repeatable; labels must not contain ':')")
+	f.StringArrayVar(&o.scores, "score", nil, "key=instructions:level0|level1|... (repeatable; levels must not contain ':')")
 	f.BoolVar(&o.raw, "raw", false, "print the server response body unchanged")
 	return cmd
 }

@@ -2,6 +2,7 @@ package cli
 
 import (
 	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -142,5 +143,105 @@ func TestRequestFromFlagsErrors(t *testing.T) {
 				t.Fatalf("got %v want substring %q", err, tt.want)
 			}
 		})
+	}
+}
+
+func TestBuildRequestTerminalStdin(t *testing.T) {
+	saved := stdinIsTerminal
+	t.Cleanup(func() { stdinIsTerminal = saved })
+	stdinIsTerminal = func(io.Reader) bool { return true }
+
+	if _, err := buildRequest(&askOptions{}, strings.NewReader("")); err == nil ||
+		!strings.Contains(err.Error(), "no request given") {
+		t.Fatalf("a terminal stdin must fail immediately, got %v", err)
+	}
+
+	doc := `{"state":"x","questions":{"a":{"type":"noul","instructions":"?"}}}`
+	req, err := buildRequest(&askOptions{file: "-"}, strings.NewReader(doc))
+	if err != nil {
+		t.Fatalf("-f - must read stdin even on a terminal: %v", err)
+	}
+	if req.State != "x" {
+		t.Fatalf("state %v", req.State)
+	}
+}
+
+func TestBuildRequestPipedStdinStillReads(t *testing.T) {
+	saved := stdinIsTerminal
+	t.Cleanup(func() { stdinIsTerminal = saved })
+	stdinIsTerminal = func(io.Reader) bool { return false }
+
+	doc := `{"state":"y","questions":{"a":{"type":"noul","instructions":"?"}}}`
+	req, err := buildRequest(&askOptions{}, strings.NewReader(doc))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if req.State != "y" {
+		t.Fatalf("state %v", req.State)
+	}
+}
+
+func TestStdinIsTerminalOnNonFile(t *testing.T) {
+	if stdinIsTerminal(strings.NewReader("")) {
+		t.Fatal("a non-*os.File reader is never a terminal")
+	}
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = r.Close(); _ = w.Close() })
+	if stdinIsTerminal(r) {
+		t.Fatal("a pipe is not a terminal")
+	}
+}
+
+func TestSplitInstrLabelsUsesLastColon(t *testing.T) {
+	instr, labels, err := splitInstrLabels("Is the tone calm: yes or no?:calm,angry", ",", "--choice")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if instr != "Is the tone calm: yes or no?" {
+		t.Fatalf("instructions %q", instr)
+	}
+	if len(labels) != 2 || labels[0] != "calm" || labels[1] != "angry" {
+		t.Fatalf("labels %v", labels)
+	}
+
+	instr, levels, err := splitInstrLabels("Urgency, on a scale: how bad?:low|mid|high", "|", "--score")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if instr != "Urgency, on a scale: how bad?" {
+		t.Fatalf("instructions %q", instr)
+	}
+	if len(levels) != 3 || levels[2] != "high" {
+		t.Fatalf("levels %v", levels)
+	}
+
+	if _, _, err := splitInstrLabels("no colon here", ",", "--choice"); err == nil {
+		t.Fatal("a value with no colon must still error")
+	}
+}
+
+func TestRequestFromFlagsColonInInstructions(t *testing.T) {
+	o := &askOptions{
+		state:   "s",
+		choices: []string{"tone=Is the tone calm: yes or no?:calm,angry"},
+		scores:  []string{"urgency=Urgency: how bad?:low|high"},
+	}
+	req, err := requestFromFlags(o, strings.NewReader(""))
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := req.Questions["tone"].(typesafe.Choice)
+	if c.Instructions != "Is the tone calm: yes or no?" || len(c.Criteria) != 2 {
+		t.Fatalf("choice %+v", c)
+	}
+	if _, ok := c.Criteria["angry"]; !ok {
+		t.Fatalf("choice labels %v", c.Criteria)
+	}
+	s := req.Questions["urgency"].(typesafe.Score)
+	if s.Instructions != "Urgency: how bad?" || len(s.Criteria) != 2 || s.Criteria[1] != "high" {
+		t.Fatalf("score %+v", s)
 	}
 }

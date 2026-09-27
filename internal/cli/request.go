@@ -33,8 +33,24 @@ func (o *askOptions) hasQuestionFlags() bool {
 	return o.state != "" || len(o.nouls)+len(o.choices)+len(o.scores) > 0
 }
 
+// errNoRequest reports that ask was invoked with nothing to send.
+var errNoRequest = errors.New("no request given: pass --file, pipe JSON to stdin, or use --state with --noul/--choice/--score")
+
+// stdinIsTerminal reports whether r is an interactive terminal. It is a
+// variable so tests can override it.
+var stdinIsTerminal = func(r io.Reader) bool {
+	f, ok := r.(*os.File)
+	if !ok {
+		return false
+	}
+	fi, err := f.Stat()
+	return err == nil && fi.Mode()&os.ModeCharDevice != 0
+}
+
 // buildRequest chooses flag mode or JSON mode. JSON comes from --file, or
-// from stdin when --file is empty and no question flags were given.
+// from stdin when --file is empty and no question flags were given. Reading
+// an interactive terminal would look like a hang, so that fails immediately;
+// an explicit "-f -" always reads stdin.
 func buildRequest(o *askOptions, stdin io.Reader) (*askRequest, error) {
 	if o.hasQuestionFlags() {
 		if o.file != "" {
@@ -45,6 +61,9 @@ func buildRequest(o *askOptions, stdin io.Reader) (*askRequest, error) {
 	var data []byte
 	var err error
 	if o.file == "" || o.file == "-" {
+		if o.file == "" && stdinIsTerminal(stdin) {
+			return nil, errNoRequest
+		}
 		data, err = io.ReadAll(stdin)
 	} else {
 		data, err = os.ReadFile(o.file)
@@ -53,7 +72,7 @@ func buildRequest(o *askOptions, stdin io.Reader) (*askRequest, error) {
 		return nil, fmt.Errorf("read request: %w", err)
 	}
 	if len(strings.TrimSpace(string(data))) == 0 {
-		return nil, errors.New("no request given: pass --file, pipe JSON to stdin, or use --state with --noul/--choice/--score")
+		return nil, errNoRequest
 	}
 	return parseRequestJSON(data)
 }
@@ -256,10 +275,11 @@ func splitKV(s, flag string) (string, string, error) {
 	return strings.TrimSpace(s[:i]), s[i+1:], nil
 }
 
-// splitInstrLabels splits "instructions:l1<sep>l2" on the first ':' and
-// then on sep, trimming each label and rejecting empties.
+// splitInstrLabels splits "instructions:l1<sep>l2" on the LAST ':' and then
+// on sep, trimming each label and rejecting empties. Splitting last lets
+// instructions contain colons; labels and levels therefore must not.
 func splitInstrLabels(rest, sep, flag string) (string, []string, error) {
-	i := strings.Index(rest, ":")
+	i := strings.LastIndex(rest, ":")
 	if i < 0 {
 		return "", nil, fmt.Errorf("%s %q: expected key=instructions:labels", flag, rest)
 	}

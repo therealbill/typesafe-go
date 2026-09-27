@@ -250,3 +250,24 @@ func TestUnknownCommandIsUsage(t *testing.T) {
 		t.Fatalf("exit %d stderr %s", code, errOut)
 	}
 }
+
+func TestAskTerminalStdinIsUsageError(t *testing.T) {
+	saved := stdinIsTerminal
+	t.Cleanup(func() { stdinIsTerminal = saved })
+	stdinIsTerminal = func(io.Reader) bool { return true }
+
+	srv, rec := serve(t, 200, okBody, nil)
+	code, out, errOut := run(t, "", append([]string{"ask"}, baseArgs(srv.URL)...)...)
+	if code != ExitUsage {
+		t.Fatalf("exit %d want %d; stdout %s stderr %s", code, ExitUsage, out, errOut)
+	}
+	if !strings.Contains(out, `"kind":"usage"`) || !strings.Contains(out, "no request given") {
+		t.Fatalf("stdout %s", out)
+	}
+	rec.mu.Lock()
+	calls := rec.calls
+	rec.mu.Unlock()
+	if calls != 0 {
+		t.Fatalf("a terminal stdin must not reach the API, got %d calls", calls)
+	}
+}
