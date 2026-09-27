@@ -41,9 +41,16 @@ type UnknownAnswer struct {
 	Raw  json.RawMessage
 }
 
-func (NoulAnswer) AnswerType() string      { return "noul" }
-func (ChoiceAnswer) AnswerType() string    { return "choice" }
-func (ScoreAnswer) AnswerType() string     { return "score" }
+// AnswerType returns "noul".
+func (NoulAnswer) AnswerType() string { return "noul" }
+
+// AnswerType returns "choice".
+func (ChoiceAnswer) AnswerType() string { return "choice" }
+
+// AnswerType returns "score".
+func (ScoreAnswer) AnswerType() string { return "score" }
+
+// AnswerType returns the wire type of the unknown answer.
 func (a UnknownAnswer) AnswerType() string { return a.Type }
 
 // Usage is the token usage reported by the API. Fields are nil when absent.

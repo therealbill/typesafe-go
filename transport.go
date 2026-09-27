@@ -85,7 +85,7 @@ func (c *Client) attempt(ctx context.Context, method, path string, body []byte, 
 	if err != nil {
 		return nil, nil, wrapTransportError(err, ctx, actx, timeout)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	data, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 	if err != nil {
 		return nil, nil, wrapTransportError(err, ctx, actx, timeout)
