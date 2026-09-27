@@ -6051,7 +6051,7 @@ func markdown(reports []unitReport) string {
 }
 ```
 
-- [ ] **Step 5: Run unit tests, then run it for real**
+- [x] **Step 5: Run unit tests, then run it for real**
 
 ```bash
 go test -v ./tools/selfreview/ 2>&1 | tail -8
@@ -6059,7 +6059,7 @@ make build && go run ./tools/selfreview -only questions 2>&1 | head -20
 ```
 Expected: unit tests PASS. The real run prints a one-row table for `questions` with a coverage fraction and a request ID in `selfreview-report.json`. If `jev ask` exits non-zero, the report row shows the error and the exit code; fix the request shape before proceeding.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 gofmt -l . ; go vet ./... && go test ./...
