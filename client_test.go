@@ -780,3 +780,41 @@ func TestClientNeverPrintsTheAPIKey(t *testing.T) {
 		t.Fatalf("slog should show the base URL: %s", buf.String())
 	}
 }
+
+func TestWithHeadersIsCopiedAtConstruction(t *testing.T) {
+	fs := newFakeServer(t, okStep(t))
+	h := http.Header{"X-Client": {"a"}}
+	opt := WithHeaders(h)
+	h.Set("X-Client", "mutated")
+	h.Set("X-Sneaked", "yes")
+	c := newTestClient(t, fs.URL, opt)
+	if _, err := c.SystemOne(context.Background(), fixtureState, fixtureQuestions); err != nil {
+		t.Fatal(err)
+	}
+	req := fs.requests[0]
+	if got := req.Header.Get("X-Client"); got != "a" {
+		t.Fatalf("the option must copy the caller's header, got %q", got)
+	}
+	if req.Header.Get("X-Sneaked") != "" {
+		t.Fatal("a later insertion must not reach the wire")
+	}
+}
+
+func TestWithExtraHeadersIsCopiedAtConstruction(t *testing.T) {
+	fs := newFakeServer(t, okStep(t))
+	c := newTestClient(t, fs.URL)
+	h := http.Header{"X-Req": {"b"}}
+	opt := WithExtraHeaders(h)
+	h.Set("X-Req", "mutated")
+	h.Set("X-Sneaked", "yes")
+	if _, err := c.SystemOne(context.Background(), fixtureState, fixtureQuestions, opt); err != nil {
+		t.Fatal(err)
+	}
+	req := fs.requests[0]
+	if got := req.Header.Get("X-Req"); got != "b" {
+		t.Fatalf("the option must copy the caller's header, got %q", got)
+	}
+	if req.Header.Get("X-Sneaked") != "" {
+		t.Fatal("a later insertion must not reach the wire")
+	}
+}

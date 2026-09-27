@@ -49,7 +49,8 @@ type Client struct {
 type Option func(*Client) error
 
 // WithAPIKey sets the API key, ignoring surrounding whitespace. Otherwise
-// TYPESAFE_API_KEY is used.
+// TYPESAFE_API_KEY is used. An empty or whitespace-only key is treated as
+// unset and the environment is consulted.
 func WithAPIKey(key string) Option {
 	return func(c *Client) error { c.apiKey = strings.TrimSpace(key); return nil }
 }
@@ -94,7 +95,10 @@ func WithTimeout(d time.Duration) Option {
 // one the client would send, so supplying Authorization replaces the API key
 // header, which some gateways require.
 func WithHeaders(h http.Header) Option {
-	return func(c *Client) error { c.headers = h.Clone(); return nil }
+	// Clone now, not when the option is applied, so a caller that keeps
+	// writing to its header after building the option cannot change requests.
+	cp := h.Clone()
+	return func(c *Client) error { c.headers = cp; return nil }
 }
 
 // WithHTTPClient uses a caller-supplied http.Client. The client is copied so
@@ -280,7 +284,9 @@ func WithRequestTimeout(d time.Duration) RequestOption {
 // the same name. As with WithHeaders, an Authorization header given here
 // replaces the API key header.
 func WithExtraHeaders(h http.Header) RequestOption {
-	return func(rc *requestConfig) error { rc.headers = h.Clone(); return nil }
+	// Cloned at construction, as in WithHeaders.
+	cp := h.Clone()
+	return func(rc *requestConfig) error { rc.headers = cp; return nil }
 }
 
 // WithExtraBody merges fields into the top level of the request body. Use it

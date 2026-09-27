@@ -107,7 +107,9 @@
         "SystemOneAs returns the full response alongside the typed value",
         "SystemOneAs returns ResponseValidationError when a field's answer type does not match",
         "SystemOneAs returns a nil response on request errors"
-      ]
+      ],
+      "accepted": ["thoroughness"],
+      "notes": ["thoroughness: 1.98, 2.05, 2.06, 2.06, 1.94 across five runs with all four behaviors at 0.87 or above; threshold sits inside the model's drift band"]
     },
     {
       "name": "otel",
