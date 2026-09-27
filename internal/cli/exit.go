@@ -86,6 +86,6 @@ func fail(io IO, pretty bool, err error) error {
 		}
 	}
 	_ = writeJSON(io.Out, map[string]any{"error": p}, pretty)
-	fmt.Fprintln(io.Err, "jev:", err)
+	_, _ = fmt.Fprintln(io.Err, "jev:", err)
 	return &ExitError{Code: code, Kind: kind, Err: err}
 }

@@ -19,7 +19,7 @@ func newModelsCmd(g *globals, streams IO, getenv func(string) string) *cobra.Com
 			if err != nil {
 				return fail(streams, g.pretty, err)
 			}
-			defer client.Close()
+			defer func() { _ = client.Close() }()
 			res, err := client.ListModels(ctx)
 			if err != nil {
 				return fail(streams, g.pretty, err)

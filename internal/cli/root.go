@@ -101,6 +101,6 @@ func Main(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if errors.As(err, &ee) {
 		return ee.Code
 	}
-	fmt.Fprintf(stderr, "jev: %v\nRun 'jev --help' for usage.\n", err)
+	_, _ = fmt.Fprintf(stderr, "jev: %v\nRun 'jev --help' for usage.\n", err)
 	return ExitUsage
 }

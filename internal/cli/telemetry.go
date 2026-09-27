@@ -35,12 +35,12 @@ func setupTelemetry(ctx context.Context, g *globals, streams IO, getenv func(str
 	}
 	cfg, err := telemetryConfig(getenv)
 	if err != nil {
-		fmt.Fprintln(streams.Err, "jev: tracing disabled:", err)
+		_, _ = fmt.Fprintln(streams.Err, "jev: tracing disabled:", err)
 		return noop, nil
 	}
 	sdk, err := otelconf.NewSDK(otelconf.WithContext(ctx), otelconf.WithOpenTelemetryConfiguration(cfg))
 	if err != nil {
-		fmt.Fprintln(streams.Err, "jev: tracing disabled:", err)
+		_, _ = fmt.Fprintln(streams.Err, "jev: tracing disabled:", err)
 		return noop, nil
 	}
 	otelapi.SetTracerProvider(sdk.TracerProvider())
@@ -51,7 +51,7 @@ func setupTelemetry(ctx context.Context, g *globals, streams IO, getenv func(str
 		c, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		if err := sdk.Shutdown(c); err != nil {
-			fmt.Fprintln(streams.Err, "jev: tracing shutdown:", err)
+			_, _ = fmt.Fprintln(streams.Err, "jev: tracing shutdown:", err)
 		}
 	}
 	return shutdown, tsotel.New()

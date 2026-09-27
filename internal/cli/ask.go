@@ -54,7 +54,7 @@ func runAsk(cmd *cobra.Command, g *globals, o *askOptions, streams IO, getenv fu
 	if err != nil {
 		return fail(streams, g.pretty, err)
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	var ropts []typesafe.RequestOption
 	if req.Model != "" && !cmd.Flags().Changed("model") {
