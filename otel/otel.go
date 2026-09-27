@@ -16,6 +16,7 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+	"unicode/utf8"
 
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	otelapi "go.opentelemetry.io/otel"
@@ -38,6 +39,7 @@ const ProviderName = "typesafe"
 const (
 	AttrProviderName  = "gen_ai.provider.name"
 	AttrSystem        = "gen_ai.system"
+	AttrOperationName = "gen_ai.operation.name"
 	AttrRequestModel  = "gen_ai.request.model"
 	AttrResponseModel = "gen_ai.response.model"
 	AttrInputTokens   = "gen_ai.usage.input_tokens"
@@ -55,6 +57,10 @@ const (
 )
 
 const truncatedMarker = "...(truncated)"
+
+// maxAnswerChoiceBytes bounds a recorded choice value so a pathological
+// label cannot bloat a span.
+const maxAnswerChoiceBytes = 256
 
 // Option configures the instrumentation.
 type Option func(*instrumentation)
@@ -108,6 +114,7 @@ func (i *instrumentation) RequestStart(ctx context.Context, info typesafe.Reques
 	attrs := []attribute.KeyValue{
 		attribute.String(AttrProviderName, ProviderName),
 		attribute.String(AttrSystem, ProviderName),
+		attribute.String(AttrOperationName, info.Operation),
 		attribute.String(AttrRequestModel, info.Model),
 	}
 	if info.Operation == "system_one" {
@@ -117,15 +124,18 @@ func (i *instrumentation) RequestStart(ctx context.Context, info typesafe.Reques
 			attribute.Int(AttrChoiceCount, info.ChoiceCount),
 			attribute.Int(AttrScoreCount, info.ScoreCount),
 		)
-		if i.contentBytes > 0 {
-			attrs = append(attrs,
-				attribute.String(AttrState, truncatedJSON(info.State, i.contentBytes)),
-				attribute.String(AttrQuestions, truncatedJSON(info.Questions, i.contentBytes)),
-			)
-		}
 	}
 	ctx, span := i.tracer().Start(ctx, "typesafe."+info.Operation,
 		trace.WithSpanKind(trace.SpanKindClient), trace.WithAttributes(attrs...))
+	// Marshaling state and questions is wasted work for a span nobody will
+	// export, and content is the one thing this package must not produce
+	// speculatively.
+	if info.Operation == "system_one" && i.contentBytes > 0 && span.IsRecording() {
+		span.SetAttributes(
+			attribute.String(AttrState, truncatedJSON(info.State, i.contentBytes)),
+			attribute.String(AttrQuestions, truncatedJSON(info.Questions, i.contentBytes)),
+		)
+	}
 	return ctx, func(r typesafe.RequestResult) {
 		defer span.End()
 		out := []attribute.KeyValue{attribute.Int(AttrRetryAttempts, r.Attempts)}
@@ -181,7 +191,8 @@ func answerAttributes(res *typesafe.SystemOneResponse) []attribute.KeyValue {
 		case typesafe.NoulAnswer:
 			out = append(out, attribute.Float64(p+".noul", v.Noul))
 		case typesafe.ChoiceAnswer:
-			out = append(out, attribute.String(p+".choice", v.Choice), attribute.Float64(p+".confidence", v.Confidence))
+			choice := truncateRuneSafe(v.Choice, maxAnswerChoiceBytes)
+			out = append(out, attribute.String(p+".choice", choice), attribute.Float64(p+".confidence", v.Confidence))
 		case typesafe.ScoreAnswer:
 			out = append(out, attribute.Float64(p+".score", v.Score), attribute.Float64(p+".confidence", v.Confidence))
 		}
@@ -196,9 +207,23 @@ func truncatedJSON(v any, maxBytes int) string {
 	}
 	s := string(b)
 	if len(s) > maxBytes {
-		return s[:maxBytes] + truncatedMarker
+		return truncateRuneSafe(s, maxBytes) + truncatedMarker
 	}
 	return s
+}
+
+// truncateRuneSafe cuts s to at most maxBytes bytes without splitting a
+// multi-byte UTF-8 rune. A cut point landing on a continuation byte is
+// walked back to the nearest preceding rune boundary, so the result is
+// always valid UTF-8 given valid UTF-8 input.
+func truncateRuneSafe(s string, maxBytes int) string {
+	if len(s) <= maxBytes {
+		return s
+	}
+	for maxBytes > 0 && !utf8.RuneStart(s[maxBytes]) {
+		maxBytes--
+	}
+	return s[:maxBytes]
 }
 
 func errorType(err error) string {

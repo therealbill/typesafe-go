@@ -2,10 +2,12 @@ package otel
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	otelapi "go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -66,7 +68,7 @@ func TestSpanOnSuccess(t *testing.T) {
 	}
 	a := attrMap(s.Attributes)
 	want := map[string]any{
-		AttrProviderName: "typesafe", AttrSystem: "typesafe",
+		AttrProviderName: "typesafe", AttrSystem: "typesafe", AttrOperationName: "system_one",
 		AttrRequestModel: "jev-latest", AttrResponseModel: "jev-1.13.0",
 		AttrInputTokens: int64(407), AttrOutputTokens: int64(72),
 		AttrRequestID: "req_1", AttrQuestionCount: int64(3), AttrNoulCount: int64(1),
@@ -138,8 +140,12 @@ func TestListModelsSpan(t *testing.T) {
 	if s.Name != "typesafe.list_models" {
 		t.Fatalf("name %s", s.Name)
 	}
-	if _, ok := attrMap(s.Attributes)[AttrQuestionCount]; ok {
+	a := attrMap(s.Attributes)
+	if _, ok := a[AttrQuestionCount]; ok {
 		t.Fatal("question counts do not apply to list_models")
+	}
+	if a[AttrOperationName] != "list_models" {
+		t.Fatalf("%s = %v want %q", AttrOperationName, a[AttrOperationName], "list_models")
 	}
 }
 
@@ -210,4 +216,65 @@ func names(spans tracetest.SpanStubs) []string {
 		out = append(out, s.Name)
 	}
 	return out
+}
+
+// TestTruncatedJSONRuneSafe exercises every truncation length against a
+// string containing multi-byte runes so a cut point can never land in the
+// middle of one. A cut mid-rune produces invalid UTF-8, which fails
+// protobuf marshaling for the whole OTLP batch.
+func TestTruncatedJSONRuneSafe(t *testing.T) {
+	v := map[string]string{"s": "café ünïcode 日本語"}
+	full, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for limit := 1; limit < len(full); limit++ {
+		got := truncatedJSON(v, limit)
+		if !utf8.ValidString(got) {
+			t.Fatalf("limit %d: invalid utf8: %q", limit, got)
+		}
+		if !strings.HasSuffix(got, truncatedMarker) {
+			t.Fatalf("limit %d: missing truncation marker: %q", limit, got)
+		}
+	}
+}
+
+// TestRecordContentSkippedWhenNotRecording ensures content marshaling only
+// happens for spans that are actually recording, and never panics when the
+// sampler drops the span.
+func TestRecordContentSkippedWhenNotRecording(t *testing.T) {
+	exp := tracetest.NewInMemoryExporter()
+	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exp), sdktrace.WithSampler(sdktrace.NeverSample()))
+	t.Cleanup(func() { _ = tp.Shutdown(context.Background()) })
+	inst := New(WithTracerProvider(tp), WithRecordContent(20))
+	_, finish := inst.RequestStart(context.Background(), sampleInfo())
+	finish(typesafe.RequestResult{Attempts: 1, Status: 200})
+	if got := len(exp.GetSpans()); got != 0 {
+		t.Fatalf("expected no exported spans from a never-sampling provider, got %d", got)
+	}
+}
+
+// TestRecordAnswersTruncatesChoice ensures a pathologically long choice
+// value cannot bloat a span, and that the truncation respects rune
+// boundaries.
+func TestRecordAnswersTruncatesChoice(t *testing.T) {
+	exp, tp := newRecorder(t)
+	inst := New(WithTracerProvider(tp), WithRecordAnswers())
+	_, finish := inst.RequestStart(context.Background(), sampleInfo())
+	long := strings.Repeat("café ", 100)
+	res := &typesafe.SystemOneResponse{Answers: map[string]typesafe.Answer{
+		"tone": typesafe.ChoiceAnswer{Choice: long, Confidence: 0.5},
+	}}
+	finish(typesafe.RequestResult{Attempts: 1, Status: 200, Response: res})
+	a := attrMap(exp.GetSpans()[0].Attributes)
+	choice, _ := a["typesafe.answer.tone.choice"].(string)
+	if len(choice) > 256 {
+		t.Fatalf("choice attr too long: %d bytes", len(choice))
+	}
+	if !utf8.ValidString(choice) {
+		t.Fatalf("choice attr invalid utf8: %q", choice)
+	}
+	if choice == long {
+		t.Fatal("choice should have been truncated")
+	}
 }
