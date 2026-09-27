@@ -119,7 +119,7 @@ async client; callers use goroutines and `ctx`.
 ### Questions
 
 ```go
-type JSONContent = any            // string, map[string]any, or []any; validated at send time
+type JSONContent = any            // string, map, slice, json.RawMessage, or a struct that encodes to an object; validated at send time
 
 type Question interface{ question() } // closed set
 type Questions map[string]Question
@@ -135,7 +135,8 @@ Wire encoding matches the HTTP API exactly. `Noul.Criteria` is omitted when
 nil; a nil `Choice` label value encodes as JSON `null`. Client-side validation
 runs before any network call and returns `*ValidationError{Path, Err}` with
 paths like `questions.tone.criteria`. Rules: choice 1–255 labels; score 2–10
-levels; `JSONContent` must be a string, map, or slice (or nil where optional);
+levels; `JSONContent` must be a string, map, slice, array, `json.RawMessage`, or a
+struct or pointer to struct that encodes to a JSON object (nil only where optional);
 `questions` must be non-empty; `state` must be non-nil JSON content.
 `RawQuestion` is only checked for a string `type` field.
 
@@ -337,16 +338,18 @@ Exit codes:
 | 3 | 401 or 403 |
 | 4 | 400, 404, 422 |
 | 5 | 429 after retries exhausted |
-| 6 | 5xx (including 529) after retries exhausted |
+| 6 | 5xx (including 529) after retries exhausted, or a 2xx body that failed decoding (`kind` `invalid_response`) |
 | 7 | connection error or timeout |
 
 On error: one line on stderr, and on stdout a JSON object
 `{"error": {"status", "request_id", "message", "kind"}}`.
 
 Telemetry: the CLI initializes the OTel SDK via `otelconf.NewSDK()` when
-`--trace` is set or when `HONEYCOMB_API_KEY` or
-`OTEL_EXPORTER_OTLP_ENDPOINT` is present in the environment, unless
-`--no-trace`. `OTEL_SERVICE_NAME` defaults to `jev`. The SDK is flushed and
+`--trace` is set or when `HONEYCOMB_API_KEY`, `OTEL_EXPORTER_OTLP_ENDPOINT`,
+or `OTEL_CONFIG_FILE` is present in the environment, unless `--no-trace`,
+which always wins. An `OTEL_CONFIG_FILE` is read with `${VAR}` expansion from
+the environment before parsing. Exporter failures are reported on stderr and
+never change the exit code. `OTEL_SERVICE_NAME` defaults to `jev`. The SDK is flushed and
 shut down before exit. The client is built with `typesafe/otel.New()`.
 
 ## Testing
