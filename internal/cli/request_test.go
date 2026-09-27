@@ -1,0 +1,146 @@
+package cli
+
+import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/therealbill/typesafe-go"
+)
+
+func TestParseRequestJSON(t *testing.T) {
+	doc := `{"model":"jev-preview","state":{"ticket":"hi"},"questions":{
+		"b":{"type":"noul","instructions":"Is it billing?","criteria":{"true":"yes","false":"no"}},
+		"t":{"type":"choice","instructions":"tone","criteria":{"calm":null,"angry":"mad"}},
+		"u":{"type":"score","instructions":"urgency","criteria":["low","high"]},
+		"f":{"type":"future","weight":2}},
+		"weight":3}`
+	req, err := parseRequestJSON([]byte(doc))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if req.Model != "jev-preview" {
+		t.Fatalf("model %q", req.Model)
+	}
+	if req.State.(map[string]any)["ticket"] != "hi" {
+		t.Fatalf("state %v", req.State)
+	}
+	n := req.Questions["b"].(typesafe.Noul)
+	if n.Instructions != "Is it billing?" || n.Criteria == nil || n.Criteria.True != "yes" || n.Criteria.False != "no" {
+		t.Fatalf("noul %+v", n)
+	}
+	c := req.Questions["t"].(typesafe.Choice)
+	if c.Criteria["angry"] != "mad" || c.Criteria["calm"] != nil {
+		t.Fatalf("choice %+v", c)
+	}
+	s := req.Questions["u"].(typesafe.Score)
+	if len(s.Criteria) != 2 || s.Criteria[1] != "high" {
+		t.Fatalf("score %+v", s)
+	}
+	r := req.Questions["f"].(typesafe.RawQuestion)
+	if r["type"] != "future" || r["weight"] != float64(2) {
+		t.Fatalf("raw %+v", r)
+	}
+	if req.Extra["weight"] != float64(3) {
+		t.Fatalf("extra %v", req.Extra)
+	}
+	out, _ := json.Marshal(req.Questions["b"])
+	if string(out) != `{"criteria":{"false":"no","true":"yes"},"instructions":"Is it billing?","type":"noul"}` {
+		t.Fatalf("re-marshaled noul %s", out)
+	}
+}
+
+func TestParseRequestJSONErrors(t *testing.T) {
+	tests := []struct {
+		name string
+		doc  string
+		want string
+	}{
+		{"not json", `{`, "invalid request JSON"},
+		{"array", `[]`, "invalid request JSON"},
+		{"no state", `{"questions":{"a":{"type":"noul"}}}`, `"state" is required`},
+		{"no questions", `{"state":"x"}`, `"questions" is required`},
+		{"question not object", `{"state":"x","questions":{"a":5}}`, "questions.a"},
+		{"question no type", `{"state":"x","questions":{"a":{"instructions":"?"}}}`, "questions.a.type"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := parseRequestJSON([]byte(tt.doc))
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("got %v want substring %q", err, tt.want)
+			}
+		})
+	}
+}
+
+func TestRequestFromFlags(t *testing.T) {
+	o := &askOptions{
+		state:   "I was charged twice",
+		nouls:   []string{"billing=Is this about billing?"},
+		choices: []string{"tone=What is the tone?:calm, angry,neutral"},
+		scores:  []string{"urgency=How urgent?:low|mid|high"},
+	}
+	req, err := requestFromFlags(o, strings.NewReader(""))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if req.State != "I was charged twice" {
+		t.Fatalf("state %v", req.State)
+	}
+	if req.Questions["billing"].(typesafe.Noul).Instructions != "Is this about billing?" {
+		t.Fatalf("noul %+v", req.Questions["billing"])
+	}
+	c := req.Questions["tone"].(typesafe.Choice)
+	if c.Instructions != "What is the tone?" || len(c.Criteria) != 3 || c.Criteria["angry"] != nil {
+		t.Fatalf("choice %+v", c)
+	}
+	if _, ok := c.Criteria["angry"]; !ok {
+		t.Fatal("labels must be trimmed")
+	}
+	s := req.Questions["urgency"].(typesafe.Score)
+	if s.Instructions != "How urgent?" || len(s.Criteria) != 3 || s.Criteria[2] != "high" {
+		t.Fatalf("score %+v", s)
+	}
+}
+
+func TestRequestFromFlagsStateSources(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "state.txt")
+	if err := os.WriteFile(path, []byte("from file"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	req, err := requestFromFlags(&askOptions{state: "@" + path, nouls: []string{"a=b"}}, strings.NewReader(""))
+	if err != nil || req.State != "from file" {
+		t.Fatalf("file state: %v %v", req, err)
+	}
+	req, err = requestFromFlags(&askOptions{state: "-", nouls: []string{"a=b"}}, strings.NewReader("from stdin"))
+	if err != nil || req.State != "from stdin" {
+		t.Fatalf("stdin state: %v %v", req, err)
+	}
+}
+
+func TestRequestFromFlagsErrors(t *testing.T) {
+	tests := []struct {
+		name string
+		o    *askOptions
+		want string
+	}{
+		{"no state", &askOptions{nouls: []string{"a=b"}}, "--state is required"},
+		{"noul no equals", &askOptions{state: "s", nouls: []string{"ab"}}, "--noul"},
+		{"choice no colon", &askOptions{state: "s", choices: []string{"a=b"}}, "--choice"},
+		{"choice empty label", &askOptions{state: "s", choices: []string{"a=b:x,,y"}}, "--choice"},
+		{"score no bar", &askOptions{state: "s", scores: []string{"a=b:only"}}, "--score"},
+		{"duplicate key", &askOptions{state: "s", nouls: []string{"a=b"}, scores: []string{"a=b:x|y"}}, "duplicate"},
+		{"missing file", &askOptions{state: "@/nonexistent/file", nouls: []string{"a=b"}}, "state file"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := requestFromFlags(tt.o, strings.NewReader(""))
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("got %v want substring %q", err, tt.want)
+			}
+		})
+	}
+}
