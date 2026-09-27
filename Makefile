@@ -13,6 +13,7 @@ help: ## Show this help
 test: ## Run unit tests with the race detector
 	go test -race -cover ./...
 
+# Locally, run as: GOTOOLCHAIN=go1.25.12 make lint
 lint: ## Run gofmt check, go vet, and golangci-lint
 	@test -z "$$(gofmt -l .)" || (gofmt -l . && echo "gofmt: files need formatting" && exit 1)
 	go vet ./...
