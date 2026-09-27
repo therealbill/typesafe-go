@@ -62,7 +62,7 @@ func TestBundleTruncates(t *testing.T) {
 }
 
 func TestEvaluate(t *testing.T) {
-	u := unit{Name: "x", Behaviors: []string{"b0", "b1"}, Accepted: []string{"covers_01"}}
+	u := unit{Name: "x", Behaviors: []string{"b0", "b1"}, Accepted: []string{"covers_01"}, Notes: []string{"covers_01: known noise"}}
 	ans := map[string]map[string]any{
 		"covers_00":        {"type": "noul", "noul": 0.9},
 		"covers_01":        {"type": "noul", "noul": 0.2},
@@ -76,6 +76,9 @@ func TestEvaluate(t *testing.T) {
 	}
 	if r.Failing {
 		t.Fatal("an accepted flag must not fail the unit")
+	}
+	if len(r.Notes) != 1 || r.Notes[0] != "covers_01: known noise" {
+		t.Fatalf("notes must travel into the report so an acceptance carries its rationale, got %v", r.Notes)
 	}
 	ans["contradicts_spec"]["noul"] = 0.7
 	r = evaluate(u, ans, thresholds{minCover: 0.6, maxContradict: 0.4, minThorough: 2.0})

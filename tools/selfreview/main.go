@@ -27,6 +27,9 @@ type unit struct {
 	// Accepted lists question ids whose flags are acknowledged and do not
 	// fail the run, for example "covers_03".
 	Accepted []string `json:"accepted,omitempty"`
+	// Notes records why each acceptance was granted. Notes are copied into
+	// the report so an accepted flag always carries its rationale.
+	Notes []string `json:"notes,omitempty"`
 }
 
 type config struct {
@@ -59,6 +62,7 @@ type unitReport struct {
 	Weakest      string           `json:"weakest_area"`
 	WeakestConf  float64          `json:"weakest_confidence"`
 	Flags        []string         `json:"flags"`
+	Notes        []string         `json:"notes,omitempty"`
 	Failing      bool             `json:"failing"`
 	Error        string           `json:"error,omitempty"`
 }
@@ -276,7 +280,7 @@ func buildQuestions(u unit) map[string]any {
 }
 
 func evaluate(u unit, answers map[string]map[string]any, th thresholds) unitReport {
-	r := unitReport{Name: u.Name}
+	r := unitReport{Name: u.Name, Notes: u.Notes}
 	accepted := map[string]bool{}
 	for _, a := range u.Accepted {
 		accepted[a] = true
@@ -347,6 +351,12 @@ func markdown(reports []unitReport) string {
 		fmt.Fprintf(&b, "## %s\n\n", r.Name)
 		if r.Truncated {
 			b.WriteString("note: sources were truncated to fit the state budget\n\n")
+		}
+		for _, n := range r.Notes {
+			b.WriteString("note: " + n + "\n")
+		}
+		if len(r.Notes) > 0 {
+			b.WriteString("\n")
 		}
 		flags := append([]string(nil), r.Flags...)
 		sort.Strings(flags)
