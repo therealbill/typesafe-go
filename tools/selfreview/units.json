@@ -1,0 +1,138 @@
+{
+  "spec": "docs/superpowers/specs/2026-09-23-typesafe-go-sdk-design.md",
+  "units": [
+    {
+      "name": "questions",
+      "spec_heading": "### Questions",
+      "implementation": ["question.go"],
+      "tests": ["question_test.go"],
+      "behaviors": [
+        "Noul.Criteria is omitted from the wire JSON when nil",
+        "A nil Choice label value encodes as JSON null",
+        "Choice with zero labels fails validation with path questions.<key>.criteria",
+        "Choice with more than 255 labels fails validation",
+        "Score with fewer than 2 or more than 10 levels fails validation",
+        "An empty questions map fails validation with path questions",
+        "RawQuestion without a string type field fails validation",
+        "Instructions that are a number fail validation naming the instructions path",
+        "Pointers to Noul, Choice, and Score are accepted as questions"
+      ]
+    },
+    {
+      "name": "responses",
+      "spec_heading": "### Responses",
+      "implementation": ["response.go", "models.go"],
+      "tests": ["response_test.go"],
+      "behaviors": [
+        "An answer with an unrecognized type decodes to UnknownAnswer instead of failing",
+        "A choice answer with a non-numeric confidence yields ResponseValidationError with path answers.<key>.confidence",
+        "Nouls, Choices, and Scores partition the answers by type",
+        "Marshaling an answer includes its wire type field",
+        "A NoulAnswer refuses to unmarshal from a choice payload",
+        "The models list decodes name, description, and release_date"
+      ]
+    },
+    {
+      "name": "errors",
+      "spec_heading": "### Errors",
+      "implementation": ["errors.go"],
+      "tests": ["errors_test.go"],
+      "behaviors": [
+        "APIError.Message extracts text from a detail string, a detail object, and a detail array",
+        "RateLimitError unwraps to APIError via errors.As",
+        "TimeoutError unwraps to ConnectionError via errors.As",
+        "IsAuthError is true for 401 and 403 only",
+        "IsRetryable is true for 408, 429, 5xx, connection errors, and timeouts, and false for 4xx and validation errors"
+      ]
+    },
+    {
+      "name": "retry",
+      "spec_heading": "### Retry policy",
+      "implementation": ["retry.go"],
+      "tests": ["retry_test.go"],
+      "behaviors": [
+        "Default policy is 2 retries, 500ms initial delay, 5s max delay, 0.25 jitter, 30s budget",
+        "Delay doubles each retry and is capped at MaxDelay",
+        "Jitter subtracts up to the jitter fraction of the delay",
+        "retry-after-ms takes precedence over Retry-After",
+        "Retry-After accepts seconds and HTTP dates, and a past date yields zero",
+        "HonorRetryAfter=false ignores the headers",
+        "ShouldRetry overrides all other decisions",
+        "RetryOnConnErr=false and RetryOnTimeout=false are respected"
+      ]
+    },
+    {
+      "name": "client",
+      "spec_heading": "### Client",
+      "implementation": ["client.go", "transport.go"],
+      "tests": ["client_test.go"],
+      "behaviors": [
+        "A 429 followed by a 200 is retried and the retry-after-ms wait is honored",
+        "A 529 followed by a 200 is retried",
+        "Retries stop after MaxRetries and the final APIError is returned",
+        "A 422 is not retried",
+        "The request body is identical across retry attempts",
+        "The retry budget prevents a retry whose delay would exceed it",
+        "Cancelling the context during backoff returns promptly with context.Canceled",
+        "A per-attempt timeout produces TimeoutError",
+        "Validation errors are returned before any network request",
+        "WithExtraHeaders and WithExtraBody reach the wire and WithRequestModel overrides the model",
+        "NewClient fails with ErrMissingAPIKey when no key is configured",
+        "Environment variables supply base URL and model when options are absent",
+        "WithHTTPClient does not mutate the caller's http.Client",
+        "The instrumentation hook receives the request info and result including attempt count",
+        "The Authorization header and request body are never logged",
+        "The client is safe for concurrent use"
+      ]
+    },
+    {
+      "name": "typed",
+      "spec_heading": "### Responses",
+      "implementation": ["typed.go"],
+      "tests": ["typed_test.go"],
+      "behaviors": [
+        "SystemOneAs decodes answers into a caller struct with json tags",
+        "SystemOneAs returns the full response alongside the typed value",
+        "SystemOneAs returns ResponseValidationError when a field's answer type does not match",
+        "SystemOneAs returns a nil response on request errors"
+      ]
+    },
+    {
+      "name": "otel",
+      "spec_heading": "## Subpackage `typesafe/otel`",
+      "implementation": ["otel/otel.go"],
+      "tests": ["otel/otel_test.go"],
+      "behaviors": [
+        "The operation span is named typesafe.system_one or typesafe.list_models with client kind",
+        "gen_ai.request.model, gen_ai.response.model, and token usage attributes are set",
+        "State and questions are not recorded unless WithRecordContent is set",
+        "Recorded content is truncated to the configured byte limit",
+        "Per-answer attributes appear only with WithRecordAnswers",
+        "On error the span status is Error and error.type is set",
+        "The HTTP span is a child of the operation span and the operation span is a child of the caller's span"
+      ]
+    },
+    {
+      "name": "cli",
+      "spec_heading": "## CLI: `cmd/jev`",
+      "implementation": ["internal/cli/root.go", "internal/cli/ask.go", "internal/cli/request.go", "internal/cli/exit.go", "internal/cli/models.go", "internal/cli/telemetry.go"],
+      "tests": ["internal/cli/cli_test.go", "internal/cli/request_test.go", "internal/cli/exit_test.go", "internal/cli/telemetry_test.go"],
+      "behaviors": [
+        "JSON on stdin in the HTTP body shape is sent unchanged apart from client-side normalization",
+        "The --model flag overrides a model in the JSON document",
+        "Flag mode builds noul, choice, and score questions from --noul, --choice, and --score",
+        "--file combined with question flags is a usage error with exit code 1",
+        "Exit code 2 for client-side validation failures",
+        "Exit code 3 for 401 and 403",
+        "Exit code 4 for 400, 404, and 422",
+        "Exit code 5 for 429 after retries",
+        "Exit code 6 for 5xx after retries",
+        "Exit code 7 for connection failures",
+        "On error stdout carries a JSON object with kind, status, request_id, and message",
+        "--raw prints the server body unchanged",
+        "--no-trace disables tracing even when HONEYCOMB_API_KEY is set",
+        "Without an endpoint the tracing config targets https://api.honeycomb.io/v1/traces with the x-honeycomb-team header"
+      ]
+    }
+  ]
+}
