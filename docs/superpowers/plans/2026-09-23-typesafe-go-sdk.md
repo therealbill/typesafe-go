@@ -3909,13 +3909,13 @@ Expected: `make help` lists the targets; `make lint` passes on whatever code exi
 - Create: `internal/cli/exit.go`, `internal/cli/exit_test.go`, `internal/cli/output.go`
 - Modify: `go.mod`, `go.sum` (via `go get`)
 
-- [ ] **Step 1: Add Cobra**
+- [x] **Step 1: Add Cobra**
 
 ```bash
 go get github.com/spf13/cobra@v1.10.2
 ```
 
-- [ ] **Step 2: Write the failing tests `internal/cli/exit_test.go`**
+- [x] **Step 2: Write the failing tests `internal/cli/exit_test.go`**
 
 ```go
 package cli
@@ -3992,14 +3992,14 @@ func TestFailWritesJSONAndReturnsExitError(t *testing.T) {
 }
 ```
 
-- [ ] **Step 3: Run tests to verify they fail**
+- [x] **Step 3: Run tests to verify they fail**
 
 ```bash
 go test ./internal/cli/ 2>&1 | head -3
 ```
 Expected: undefined `classify`, `fail`, `IO`, `ExitError`.
 
-- [ ] **Step 4: Write `internal/cli/output.go`**
+- [x] **Step 4: Write `internal/cli/output.go`**
 
 ```go
 package cli
@@ -4027,7 +4027,7 @@ func writeJSON(w io.Writer, v any, pretty bool) error {
 }
 ```
 
-- [ ] **Step 5: Write `internal/cli/exit.go`**
+- [x] **Step 5: Write `internal/cli/exit.go`**
 
 ```go
 package cli
@@ -4123,7 +4123,7 @@ func fail(io IO, pretty bool, err error) error {
 }
 ```
 
-- [ ] **Step 6: Run tests to verify they pass, then commit**
+- [x] **Step 6: Run tests to verify they pass, then commit**
 
 ```bash
 go test -v ./internal/cli/ 2>&1 | tail -6
@@ -4139,7 +4139,7 @@ git commit -m "Add CLI exit codes and error output"
 **Files:**
 - Create: `internal/cli/request.go`, `internal/cli/request_test.go`
 
-- [ ] **Step 1: Write the failing tests `internal/cli/request_test.go`**
+- [x] **Step 1: Write the failing tests `internal/cli/request_test.go`**
 
 ```go
 package cli
@@ -4290,14 +4290,14 @@ func TestRequestFromFlagsErrors(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 ```bash
 go test ./internal/cli/ 2>&1 | head -3
 ```
 Expected: undefined `parseRequestJSON`, `askOptions`, `requestFromFlags`.
 
-- [ ] **Step 3: Write `internal/cli/request.go`**
+- [x] **Step 3: Write `internal/cli/request.go`**
 
 ```go
 package cli
@@ -4578,7 +4578,7 @@ func splitInstrLabels(rest, sep, flag string) (string, []string, error) {
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass, then commit**
+- [x] **Step 4: Run tests to verify they pass, then commit**
 
 ```bash
 go test -v -run 'TestParse|TestRequestFrom' ./internal/cli/ 2>&1 | tail -8
@@ -4595,7 +4595,7 @@ git commit -m "Add CLI request parsing for JSON and flag modes"
 **Files:**
 - Create: `internal/cli/root.go`, `cmd/jev/main.go`
 
-- [ ] **Step 1: Write `internal/cli/root.go`**
+- [x] **Step 1: Write `internal/cli/root.go`**
 
 ```go
 // Package cli implements the jev command.
@@ -4706,7 +4706,7 @@ func Main(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 }
 ```
 
-- [ ] **Step 2: Write `cmd/jev/main.go`**
+- [x] **Step 2: Write `cmd/jev/main.go`**
 
 ```go
 // Command jev asks TypeSafe's Jev model typed questions from the command line.
@@ -4723,7 +4723,7 @@ func main() {
 }
 ```
 
-- [ ] **Step 3: Build check**
+- [x] **Step 3: Build check**
 
 ```bash
 go build ./... 2>&1 | head
@@ -4739,7 +4739,7 @@ Expected: errors only for `newAskCmd`, `newModelsCmd`, `newVersionCmd` (Task 16)
 - Create: `internal/cli/ask.go`, `internal/cli/models.go`, `internal/cli/version.go`
 - Create: `internal/cli/telemetry.go` (stub now, full in Task 18)
 
-- [ ] **Step 1: Write the telemetry stub `internal/cli/telemetry.go`**
+- [x] **Step 1: Write the telemetry stub `internal/cli/telemetry.go`**
 
 ```go
 package cli
@@ -4756,7 +4756,7 @@ func setupTelemetry(ctx context.Context, g *globals, streams IO, getenv func(str
 }
 ```
 
-- [ ] **Step 2: Write `internal/cli/ask.go`**
+- [x] **Step 2: Write `internal/cli/ask.go`**
 
 ```go
 package cli
@@ -4839,7 +4839,7 @@ func runAsk(cmd *cobra.Command, g *globals, o *askOptions, streams IO, getenv fu
 }
 ```
 
-- [ ] **Step 3: Write `internal/cli/models.go`**
+- [x] **Step 3: Write `internal/cli/models.go`**
 
 ```go
 package cli
@@ -4874,7 +4874,7 @@ func newModelsCmd(g *globals, streams IO, getenv func(string) string) *cobra.Com
 }
 ```
 
-- [ ] **Step 4: Write `internal/cli/version.go`**
+- [x] **Step 4: Write `internal/cli/version.go`**
 
 ```go
 package cli
@@ -4904,7 +4904,7 @@ func newVersionCmd(streams IO) *cobra.Command {
 }
 ```
 
-- [ ] **Step 5: Build, smoke test, commit**
+- [x] **Step 5: Build, smoke test, commit**
 
 ```bash
 go build ./... && go run ./cmd/jev version && go run ./cmd/jev ask --help | head -5
@@ -4922,7 +4922,7 @@ Expected: version JSON on one line, then the ask help text.
 **Files:**
 - Create: `internal/cli/cli_test.go`
 
-- [ ] **Step 1: Write the tests**
+- [x] **Step 1: Write the tests**
 
 ```go
 package cli
@@ -5179,7 +5179,7 @@ func TestUnknownCommandIsUsage(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run and commit**
+- [x] **Step 2: Run and commit**
 
 ```bash
 go test -race -v ./internal/cli/ 2>&1 | tail -20
@@ -5198,14 +5198,14 @@ Expected: all PASS. If any exit-code row fails, fix `classify` or the command, n
 - Create: `internal/cli/telemetry_test.go`
 - Modify: `go.mod`, `go.sum`
 
-- [ ] **Step 1: Add the dependency**
+- [x] **Step 1: Add the dependency**
 
 ```bash
 go get go.opentelemetry.io/contrib/otelconf@v0.26.0
 go mod tidy
 ```
 
-- [ ] **Step 2: Write the failing tests `internal/cli/telemetry_test.go`**
+- [x] **Step 2: Write the failing tests `internal/cli/telemetry_test.go`**
 
 ```go
 package cli
@@ -5296,14 +5296,14 @@ func writeFile(path, content string) error {
 ```
 and add `"os"` to the imports.
 
-- [ ] **Step 3: Run tests to verify they fail**
+- [x] **Step 3: Run tests to verify they fail**
 
 ```bash
 go test ./internal/cli/ 2>&1 | head -3
 ```
 Expected: undefined `telemetryEnabled`, `buildTelemetryConfig`, `telemetryConfig`.
 
-- [ ] **Step 4: Replace `internal/cli/telemetry.go`**
+- [x] **Step 4: Replace `internal/cli/telemetry.go`**
 
 ```go
 package cli
@@ -5418,7 +5418,7 @@ func buildTelemetryConfig(honeycombKey, endpoint, serviceName string) otelconf.O
 
 If the compiler reports that `otelconf.NewSDK` or a struct name differs, check the installed source with `go doc go.opentelemetry.io/contrib/otelconf/x` and adapt the names; the field paths verified on 2026-09-23 are `OpenTelemetryConfiguration.TracerProvider.Processors[].Batch.Exporter.OTLPHttp.{Endpoint *string, Headers []NameStringValuePair{Name string, Value *string}}` and `Resource.Attributes []AttributeNameValue{Name string, Value any}`.
 
-- [ ] **Step 5: Run tests, live smoke, commit**
+- [x] **Step 5: Run tests, live smoke, commit**
 
 ```bash
 go test -race -v -run 'TestTelemetry|TestBuildTelemetry' ./internal/cli/ 2>&1 | tail -8
@@ -5434,14 +5434,14 @@ Expected: tests PASS. The smoke run prints the answer JSON; if `HONEYCOMB_API_KE
 
 **Agent:** `cli`
 
-- [ ] **Step 1: Full verification**
+- [x] **Step 1: Full verification**
 
 ```bash
 make lint && make test && make build && ./bin/jev version && ./bin/jev models --pretty | head -8
 ```
 Expected: lint clean, all tests pass, `bin/jev` runs, models list prints (needs `TYPESAFE_API_KEY`, which is set). Fix lint findings in `internal/cli` and `cmd/jev`; report findings in other packages to the lead.
 
-- [ ] **Step 2: Commit any lint fixes**
+- [x] **Step 2: Commit any lint fixes**
 
 ```bash
 git add internal/cli cmd/jev
