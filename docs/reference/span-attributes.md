@@ -160,5 +160,8 @@ A `ChoiceAnswer`'s `Choice` value is truncated with `truncateRuneSafe` (the
 same rune-safe helper used for `AttrState`/`AttrQuestions`) to at most
 `maxAnswerChoiceBytes` (`= 256`) bytes before being set as the
 `typesafe.answer.<key>.choice` attribute, bounding how much a pathologically
-long label can bloat a span. `Noul` and `Score` values are numeric and are
-not truncated; only the `.choice` string attribute is capped.
+long label can bloat a span. Unlike `AttrState`/`AttrQuestions`, this cut
+does not append the `...(truncated)` marker — the value is cut cleanly with
+no suffix, since it's a discrete label field rather than JSON content.
+`Noul` and `Score` values are numeric and are not truncated; only the
+`.choice` string attribute is capped.
