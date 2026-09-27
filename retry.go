@@ -23,6 +23,8 @@ type RetryPolicy struct {
 	// Budget is the total time allowed per call including delays. 0 means unlimited. Default 30s.
 	Budget time.Duration
 	// RetryStatuses lists HTTP statuses that are retried. Default 408, 429, 500–599.
+	// The default slice is shared between policies and must be treated as
+	// read-only: to change it, assign a new slice rather than writing into it.
 	RetryStatuses []int
 	// RetryOnConnErr retries connection failures. Default true.
 	RetryOnConnErr bool
@@ -32,7 +34,9 @@ type RetryPolicy struct {
 	HonorRetryAfter bool
 	// MaxRetryAfter caps a server-requested wait from Retry-After or retry-after-ms. Default 5m.
 	MaxRetryAfter time.Duration
-	// ShouldRetry, when set, replaces every other decision. resp may be nil.
+	// ShouldRetry, when set, replaces every other decision. resp may be nil,
+	// and when it is not, its Body has already been drained and closed, so
+	// only the status and headers are readable.
 	ShouldRetry func(resp *http.Response, err error) bool
 }
 
@@ -45,7 +49,7 @@ func DefaultRetryPolicy() RetryPolicy {
 		MaxDelay:        5 * time.Second,
 		Jitter:          0.25,
 		Budget:          30 * time.Second,
-		RetryStatuses:   defaultRetryStatuses(),
+		RetryStatuses:   defaultStatuses,
 		RetryOnConnErr:  true,
 		RetryOnTimeout:  true,
 		HonorRetryAfter: true,
@@ -53,8 +57,14 @@ func DefaultRetryPolicy() RetryPolicy {
 	}
 }
 
-func defaultRetryStatuses() []int {
-	s := []int{http.StatusRequestTimeout, http.StatusTooManyRequests}
+// defaultStatuses is built once and shared by every default policy, so a
+// client does not allocate a 102-element slice per request. It is read-only by
+// contract; see RetryPolicy.RetryStatuses.
+var defaultStatuses = buildDefaultStatuses()
+
+func buildDefaultStatuses() []int {
+	s := make([]int, 0, 102)
+	s = append(s, http.StatusRequestTimeout, http.StatusTooManyRequests)
 	for code := 500; code <= 599; code++ {
 		s = append(s, code)
 	}
@@ -149,12 +159,13 @@ const maxRetryAfterMillis = int64(math.MaxInt64) / int64(time.Millisecond)
 // parseRetryAfter reads retry-after-ms (milliseconds) or Retry-After
 // (seconds or an HTTP date). It returns false when neither is usable.
 //
-// A value that cannot be represented as a time.Duration is never converted
-// directly: saturating or wrapping it would produce a nonsense delay that
-// overflows the caller's budget arithmetic. A wait too large to represent is
-// reported as the maximum Duration so the caller clamps it to MaxRetryAfter,
-// while a wait that is not a finite, non-negative number of seconds is
-// reported as unusable so the caller falls back to its own backoff.
+// Retry-After is read as RFC 9110 delta-seconds, a non-negative integer, or
+// an HTTP date. A value that cannot be represented as a time.Duration is
+// never converted directly: saturating or wrapping it would produce a
+// nonsense delay that overflows the caller's budget arithmetic. A wait too
+// large to represent is reported as the maximum Duration so the caller clamps
+// it to MaxRetryAfter, while an unusable value is reported as absent so the
+// caller falls back to its own backoff.
 func parseRetryAfter(h http.Header, now time.Time) (time.Duration, bool) {
 	if v := strings.TrimSpace(h.Get("retry-after-ms")); v != "" {
 		if ms, err := strconv.ParseInt(v, 10, 64); err == nil && ms >= 0 {
@@ -168,11 +179,13 @@ func parseRetryAfter(h http.Header, now time.Time) (time.Duration, bool) {
 	if v == "" {
 		return 0, false
 	}
-	if secs, err := strconv.ParseFloat(v, 64); err == nil {
-		ns := secs * float64(time.Second)
-		if !math.IsNaN(ns) && !math.IsInf(ns, 0) && ns >= 0 && ns <= float64(math.MaxInt64) {
-			return time.Duration(ns), true
+	if secs, err := strconv.ParseUint(v, 10, 64); err == nil {
+		// RFC 9110 delta-seconds is a non-negative integer, so anything
+		// fractional, signed, or exponential is not a delay at all.
+		if secs > uint64(math.MaxInt64)/uint64(time.Second) {
+			return time.Duration(math.MaxInt64), true
 		}
+		return time.Duration(secs) * time.Second, true
 	}
 	if t, err := http.ParseTime(v); err == nil {
 		d := t.Sub(now)

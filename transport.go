@@ -36,7 +36,14 @@ func (c *Client) send(ctx context.Context, method, path string, body []byte, ext
 			err = newAPIError(resp, respBody, endpoint)
 		}
 		if ctx.Err() != nil || retry >= policy.MaxRetries || !policy.retryable(resp, err) {
-			c.logger.Error("typesafe request failed", "endpoint", endpoint, "attempt", retry+1, "error", err)
+			// A 4xx is the caller's mistake and not an incident; reserve the
+			// error level for failures the caller cannot fix.
+			var api *APIError
+			if errors.As(err, &api) && api.Status < 500 {
+				c.logger.Warn("typesafe request failed", "endpoint", endpoint, "attempt", retry+1, "error", err)
+			} else {
+				c.logger.Error("typesafe request failed", "endpoint", endpoint, "attempt", retry+1, "error", err)
+			}
 			return resp, respBody, retry + 1, err
 		}
 		var hdr http.Header
@@ -88,9 +95,14 @@ func (c *Client) attempt(ctx context.Context, method, path string, body []byte, 
 		return nil, nil, wrapTransportError(err, ctx, actx, timeout)
 	}
 	defer func() { _ = resp.Body.Close() }()
-	data, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
+	// Read one byte past the cap so an oversized body is detected rather than
+	// silently truncated into malformed JSON.
+	data, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes+1))
 	if err != nil {
 		return nil, nil, wrapTransportError(err, ctx, actx, timeout)
+	}
+	if len(data) > maxResponseBytes {
+		return nil, nil, &ResponseValidationError{FieldPath: "", Err: errors.New("response exceeds 16 MiB")}
 	}
 	return resp, data, nil
 }

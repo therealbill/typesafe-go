@@ -149,7 +149,7 @@ func TestRetryDelayRejectsUnusableRetryAfter(t *testing.T) {
 	// A value that is not a finite, non-negative number of seconds must be
 	// ignored in favour of the normal backoff. Saturating it into a Duration
 	// would overflow the retry budget check and block the call.
-	for _, v := range []string{"inf", "Inf", "NaN", "1e300", "-5"} {
+	for _, v := range []string{"inf", "Inf", "NaN", "1e300", "-5", "1_0", "1e3", "3.5", "99999999999999999999"} {
 		t.Run(v, func(t *testing.T) {
 			h := http.Header{}
 			h.Set("Retry-After", v)
@@ -181,5 +181,11 @@ func TestRetryDelayCapsServerRequestedWait(t *testing.T) {
 	h.Set("Retry-After", "60")
 	if got := p.delay(0, h, now, 0); got != time.Minute {
 		t.Fatalf("a wait under the cap must be honored unchanged, got %s", got)
+	}
+
+	h = http.Header{}
+	h.Set("Retry-After", "99999999999")
+	if got := p.delay(0, h, now, 0); got != p.MaxRetryAfter {
+		t.Fatalf("a delta-seconds value too large for a Duration should clamp, got %s", got)
 	}
 }

@@ -29,7 +29,8 @@ const (
 	EnvLogLevel     = "TYPESAFE_LOG_LEVEL"
 )
 
-// Client calls the TypeSafe API. It is safe for concurrent use.
+// Client calls the TypeSafe API. It is safe for concurrent use. The zero
+// value is not usable; build one with NewClient.
 type Client struct {
 	apiKey     string
 	baseURL    *url.URL
@@ -47,9 +48,10 @@ type Client struct {
 // Option configures a Client.
 type Option func(*Client) error
 
-// WithAPIKey sets the API key. Otherwise TYPESAFE_API_KEY is used.
+// WithAPIKey sets the API key, ignoring surrounding whitespace. Otherwise
+// TYPESAFE_API_KEY is used.
 func WithAPIKey(key string) Option {
-	return func(c *Client) error { c.apiKey = key; return nil }
+	return func(c *Client) error { c.apiKey = strings.TrimSpace(key); return nil }
 }
 
 // WithBaseURL sets the API root, for example for a gateway. Otherwise
@@ -88,7 +90,9 @@ func WithTimeout(d time.Duration) Option {
 	}
 }
 
-// WithHeaders adds headers to every request.
+// WithHeaders adds headers to every request. A header given here replaces the
+// one the client would send, so supplying Authorization replaces the API key
+// header, which some gateways require.
 func WithHeaders(h http.Header) Option {
 	return func(c *Client) error { c.headers = h.Clone(); return nil }
 }
@@ -132,7 +136,7 @@ func NewClient(opts ...Option) (*Client, error) {
 		}
 	}
 	if c.apiKey == "" {
-		c.apiKey = os.Getenv(EnvAPIKey)
+		c.apiKey = strings.TrimSpace(os.Getenv(EnvAPIKey))
 	}
 	if c.apiKey == "" {
 		return nil, ErrMissingAPIKey
@@ -215,6 +219,21 @@ func NewLogger(w io.Writer, level string) *slog.Logger {
 	return slog.New(slog.NewTextHandler(w, &slog.HandlerOptions{Level: lvl}))
 }
 
+// String describes the client without its API key, so the key cannot reach a
+// log through fmt.
+func (c *Client) String() string {
+	return fmt.Sprintf("typesafe.Client{base_url: %s, model: %s}", c.baseURL, c.model)
+}
+
+// LogValue describes the client without its API key, so the key cannot reach a
+// log through slog.
+func (c *Client) LogValue() slog.Value {
+	return slog.GroupValue(
+		slog.String("base_url", c.baseURL.String()),
+		slog.String("model", c.model),
+	)
+}
+
 // Close releases idle connections held by a client-owned http.Client.
 func (c *Client) Close() error {
 	if c.ownsHTTP {
@@ -258,16 +277,28 @@ func WithRequestTimeout(d time.Duration) RequestOption {
 }
 
 // WithExtraHeaders adds headers to this call, replacing client headers with
-// the same name.
+// the same name. As with WithHeaders, an Authorization header given here
+// replaces the API key header.
 func WithExtraHeaders(h http.Header) RequestOption {
 	return func(rc *requestConfig) error { rc.headers = h.Clone(); return nil }
 }
 
 // WithExtraBody merges fields into the top level of the request body. Use it
-// for API fields this package does not model yet.
+// for API fields this package does not model yet. The map is copied, and the
+// fields the client sets itself, state, model, and questions, are rejected.
 func WithExtraBody(fields map[string]any) RequestOption {
-	return func(rc *requestConfig) error { rc.extraBody = fields; return nil }
+	// Copy now, not when the option is applied, so a caller that keeps
+	// writing to its map after building the option cannot change the request.
+	cp := make(map[string]any, len(fields))
+	for k, v := range fields {
+		cp[k] = v
+	}
+	return func(rc *requestConfig) error { rc.extraBody = cp; return nil }
 }
+
+// reservedBodyKeys are set by the client and may not be overridden through
+// WithExtraBody. Kept sorted so the reported error is deterministic.
+var reservedBodyKeys = []string{"model", "questions", "state"}
 
 func (c *Client) requestConfig(opts []RequestOption) (requestConfig, error) {
 	rc := requestConfig{model: c.model, retry: c.retry, timeout: c.timeout}
@@ -315,6 +346,13 @@ func (c *Client) SystemOne(ctx context.Context, state any, questions Questions, 
 	if err := validateQuestions(questions); err != nil {
 		finish(RequestResult{Err: err})
 		return nil, err
+	}
+	for _, k := range reservedBodyKeys {
+		if _, ok := rc.extraBody[k]; ok {
+			verr := &ValidationError{Path: "extra_body." + k, Err: errors.New("field is set by the client and must not be overridden")}
+			finish(RequestResult{Err: verr})
+			return nil, verr
+		}
 	}
 	body := map[string]any{"state": state, "model": rc.model, "questions": questions}
 	for k, v := range rc.extraBody {

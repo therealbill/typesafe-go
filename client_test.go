@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -653,5 +654,129 @@ func TestInstrumentationRecordsPanic(t *testing.T) {
 	}
 	if fi.results[0].Err == nil || !strings.Contains(fi.results[0].Err.Error(), "panic") {
 		t.Fatalf("result %+v", fi.results[0])
+	}
+}
+
+func TestResponseBodyLimit(t *testing.T) {
+	// Stream just over the cap rather than allocating it as one string.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(200)
+		chunk := make([]byte, 64<<10)
+		for written := 0; written <= maxResponseBytes; written += len(chunk) {
+			if _, err := w.Write(chunk); err != nil {
+				return
+			}
+		}
+	}))
+	defer srv.Close()
+	p := fastPolicy()
+	p.MaxRetries = 0
+	c := newTestClient(t, srv.URL, WithRetryPolicy(p), WithTimeout(0))
+	_, err := c.SystemOne(context.Background(), fixtureState, fixtureQuestions)
+	var rve *ResponseValidationError
+	if !errors.As(err, &rve) {
+		t.Fatalf("an oversized body should be a response validation error, got %v", err)
+	}
+	if !strings.Contains(rve.Err.Error(), "exceeds") {
+		t.Fatalf("message %q", rve.Err.Error())
+	}
+}
+
+func TestAPIKeyIsTrimmed(t *testing.T) {
+	// An empty option falls back to the environment, so clear it first or an
+	// ambient key would mask the whitespace cases.
+	t.Setenv(EnvAPIKey, "")
+	c, err := NewClient(WithAPIKey("  key\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.apiKey != "key" {
+		t.Fatalf("api key %q", c.apiKey)
+	}
+	if _, err := NewClient(WithAPIKey("   \t\n")); !errors.Is(err, ErrMissingAPIKey) {
+		t.Fatalf("an all-whitespace key should be missing, got %v", err)
+	}
+	t.Setenv(EnvAPIKey, "  env-key\n")
+	c, err = NewClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.apiKey != "env-key" {
+		t.Fatalf("env key %q", c.apiKey)
+	}
+	t.Setenv(EnvAPIKey, "   ")
+	if _, err := NewClient(); !errors.Is(err, ErrMissingAPIKey) {
+		t.Fatalf("an all-whitespace env key should be missing, got %v", err)
+	}
+}
+
+func TestWithExtraBodyIsCopiedAndReservedKeysRejected(t *testing.T) {
+	fs := newFakeServer(t, okStep(t))
+	c := newTestClient(t, fs.URL)
+	fields := map[string]any{"weight": 2}
+	opt := WithExtraBody(fields)
+	fields["weight"] = 99
+	fields["sneaked"] = true
+	if _, err := c.SystemOne(context.Background(), "s", fixtureQuestions, opt); err != nil {
+		t.Fatal(err)
+	}
+	var body map[string]any
+	_ = json.Unmarshal(fs.bodies[0], &body)
+	if body["weight"] != float64(2) {
+		t.Fatalf("the option must copy the caller's map, got %v", body["weight"])
+	}
+	if _, ok := body["sneaked"]; ok {
+		t.Fatal("a later insertion must not reach the wire")
+	}
+	for _, k := range []string{"state", "model", "questions"} {
+		_, err := c.SystemOne(context.Background(), "s", fixtureQuestions, WithExtraBody(map[string]any{k: "x"}))
+		var ve *ValidationError
+		if !errors.As(err, &ve) || ve.Path != "extra_body."+k {
+			t.Fatalf("reserved key %q should be rejected, got %v", k, err)
+		}
+	}
+}
+
+func TestFinalFailureLogLevel(t *testing.T) {
+	var buf bytes.Buffer
+	fs := newFakeServer(t, step{status: 404, body: `{"detail":"Not Found"}`})
+	c := newTestClient(t, fs.URL, WithLogger(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))))
+	_, _ = c.SystemOne(context.Background(), fixtureState, fixtureQuestions)
+	if !strings.Contains(buf.String(), "level=WARN") || strings.Contains(buf.String(), "level=ERROR") {
+		t.Fatalf("a 404 is a client mistake and should log at WARN: %s", buf.String())
+	}
+
+	buf.Reset()
+	fs2 := newFakeServer(t, step{status: 503, body: `down`})
+	c2 := newTestClient(t, fs2.URL, WithLogger(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))))
+	_, _ = c2.SystemOne(context.Background(), fixtureState, fixtureQuestions)
+	if !strings.Contains(buf.String(), "level=ERROR") {
+		t.Fatalf("an exhausted 5xx should log at ERROR: %s", buf.String())
+	}
+}
+
+func TestClientNeverPrintsTheAPIKey(t *testing.T) {
+	fs := newFakeServer(t, okStep(t))
+	c := newTestClient(t, fs.URL)
+	for _, s := range []string{
+		fmt.Sprintf("%v", c),
+		fmt.Sprintf("%+v", c),
+		c.String(),
+	} {
+		if strings.Contains(s, "test-key") {
+			t.Fatalf("formatting leaked the API key: %s", s)
+		}
+		if !strings.Contains(s, DefaultModel) {
+			t.Fatalf("formatting should still show the model: %s", s)
+		}
+	}
+	var buf bytes.Buffer
+	slog.New(slog.NewTextHandler(&buf, nil)).Info("client", "client", c)
+	if strings.Contains(buf.String(), "test-key") {
+		t.Fatalf("slog leaked the API key: %s", buf.String())
+	}
+	if !strings.Contains(buf.String(), "base_url") {
+		t.Fatalf("slog should show the base URL: %s", buf.String())
 	}
 }

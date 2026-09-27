@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 )
 
 func TestAPIErrorMessage(t *testing.T) {
@@ -130,4 +131,22 @@ func TestAPIErrorHeadersNil(t *testing.T) {
 		t.Fatal("nil headers must be safe")
 	}
 	_ = http.Header{}
+}
+
+func TestMessageTruncationIsRuneSafe(t *testing.T) {
+	// A snowman is three bytes, so a 200-byte cut lands mid-rune.
+	e := &APIError{Status: 500, Body: []byte(strings.Repeat("\u2603", 100))}
+	got := e.Message()
+	if !utf8.ValidString(got) {
+		t.Fatalf("truncation split a rune: %q", got)
+	}
+	if !strings.HasSuffix(got, "...") {
+		t.Fatalf("a truncated message should be marked: %q", got)
+	}
+	if len(got) > maxMessageLen+3 {
+		t.Fatalf("truncated message is %d bytes", len(got))
+	}
+	if n := utf8.RuneCountInString(strings.TrimSuffix(got, "...")); n != 66 {
+		t.Fatalf("expected 66 whole runes in 200 bytes, got %d", n)
+	}
 }

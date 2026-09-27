@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 // ErrMissingAPIKey is returned by NewClient when no API key is configured.
@@ -78,10 +79,20 @@ func (e *APIError) Message() string {
 	if msg == "" {
 		msg = strings.TrimSpace(string(e.Body))
 	}
-	if len(msg) > maxMessageLen {
-		msg = msg[:maxMessageLen] + "..."
+	return truncate(msg, maxMessageLen)
+}
+
+// truncate shortens s to at most n bytes without splitting a rune, marking the
+// cut when one was made.
+func truncate(s string, n int) string {
+	if len(s) <= n {
+		return s
 	}
-	return msg
+	cut := n
+	for cut > 0 && !utf8.RuneStart(s[cut]) {
+		cut--
+	}
+	return s[:cut] + "..."
 }
 
 func detailMessage(raw json.RawMessage) string {
