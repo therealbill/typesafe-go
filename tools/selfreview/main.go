@@ -7,6 +7,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -14,8 +15,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
+	"time"
 )
 
 type unit struct {
@@ -63,8 +66,11 @@ type unitReport struct {
 	WeakestConf  float64          `json:"weakest_confidence"`
 	Flags        []string         `json:"flags"`
 	Notes        []string         `json:"notes,omitempty"`
-	Failing      bool             `json:"failing"`
-	Error        string           `json:"error,omitempty"`
+	// StaleAcceptances lists accepted entries whose flag did not fire, so an
+	// acceptance that is no longer needed does not sit unnoticed.
+	StaleAcceptances []string `json:"stale_acceptances,omitempty"`
+	Failing          bool     `json:"failing"`
+	Error            string   `json:"error,omitempty"`
 }
 
 const truncatedMarker = "\n// ...(truncated)\n"
@@ -78,6 +84,7 @@ func main() {
 	minCover := flag.Float64("min-cover", 0.6, "flag a behavior whose coverage probability is below this")
 	maxContradict := flag.Float64("max-contradict", 0.4, "flag a unit whose contradiction probability is above this")
 	minThorough := flag.Float64("min-thorough", 2.0, "flag a unit whose thoroughness score is below this")
+	unitTimeout := flag.Duration("unit-timeout", 2*time.Minute, "time allowed for one jev ask call")
 	flag.Parse()
 
 	if os.Getenv("TYPESAFE_API_KEY") == "" {
@@ -94,6 +101,10 @@ func main() {
 		fmt.Fprintln(os.Stderr, "selfreview: units.json:", err)
 		os.Exit(2)
 	}
+	if err := validateUnits(cfg); err != nil {
+		fmt.Fprintln(os.Stderr, "selfreview: units.json:", err)
+		os.Exit(2)
+	}
 	specBytes, err := os.ReadFile(cfg.Spec)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "selfreview:", err)
@@ -107,23 +118,54 @@ func main() {
 		if *only != "" && u.Name != *only {
 			continue
 		}
-		r := runUnit(u, string(specBytes), *jevPath, *maxBytes, th)
+		r := runUnit(u, string(specBytes), *jevPath, *maxBytes, *unitTimeout, th)
 		if r.Failing {
 			failing = true
 		}
 		reports = append(reports, r)
 	}
+	if len(reports) == 0 {
+		fmt.Fprintln(os.Stderr, "selfreview: no units matched")
+		os.Exit(2)
+	}
+	fmt.Fprintf(os.Stderr, "selfreview: ran %d units\n", len(reports))
 	out, _ := json.MarshalIndent(reports, "", "  ")
 	if err := os.WriteFile(*reportPath, out, 0o644); err != nil {
 		fmt.Fprintln(os.Stderr, "selfreview: write report:", err)
+		os.Exit(2)
 	}
-	fmt.Print(markdown(reports))
+	fmt.Print(markdown(reports, th))
 	if failing {
 		os.Exit(1)
 	}
 }
 
-func runUnit(u unit, spec, jevPath string, maxBytes int, th thresholds) unitReport {
+// coversID matches the positional question ids. They must not appear in an
+// acceptance list: renumbering the behaviors would silently move the
+// acceptance to a different claim.
+var coversID = regexp.MustCompile(`^covers_\d+$`)
+
+// validateUnits rejects configurations whose acceptances cannot be matched
+// reliably.
+func validateUnits(cfg config) error {
+	for _, u := range cfg.Units {
+		behaviors := map[string]bool{}
+		for _, b := range u.Behaviors {
+			behaviors[b] = true
+		}
+		for _, a := range u.Accepted {
+			if coversID.MatchString(a) {
+				return fmt.Errorf("unit %q accepts %q by position; name the behavior text instead", u.Name, a)
+			}
+			if !behaviors[a] && a != "contradicts_spec" && a != "thoroughness" {
+				return fmt.Errorf("unit %q accepts %q, which is neither one of its behaviors nor a question id", u.Name, a)
+			}
+		}
+	}
+	return nil
+}
+
+func runUnit(u unit, spec, jevPath string, maxBytes int, timeout time.Duration, th thresholds) unitReport {
 	r := unitReport{Name: u.Name}
 	section, err := extractSection(spec, u.SpecHeading)
 	if err != nil {
@@ -151,12 +193,19 @@ func runUnit(u unit, spec, jevPath string, maxBytes int, th thresholds) unitRepo
 		"questions": buildQuestions(u),
 	}
 	payload, _ := json.Marshal(req)
-	cmd := exec.Command(jevPath, "ask")
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, jevPath, "ask")
 	cmd.Stdin = bytes.NewReader(payload)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			r.Error = fmt.Sprintf("jev ask did not finish within %s", timeout)
+			r.Failing = true
+			return r
+		}
 		var ee *exec.ExitError
 		code := -1
 		if errors.As(err, &ee) {
@@ -203,9 +252,14 @@ func extractSection(spec, heading string) (string, error) {
 		return "", fmt.Errorf("heading %q not found in spec", heading)
 	}
 	end := len(lines)
+	fenced := false
 	for i := start + 1; i < len(lines); i++ {
 		l := lines[i]
-		if !strings.HasPrefix(l, "#") {
+		if strings.HasPrefix(strings.TrimSpace(l), "```") {
+			fenced = !fenced
+			continue
+		}
+		if fenced || !strings.HasPrefix(l, "#") {
 			continue
 		}
 		hl := len(l) - len(strings.TrimLeft(l, "#"))
@@ -281,12 +335,16 @@ func buildQuestions(u unit) map[string]any {
 
 func evaluate(u unit, answers map[string]map[string]any, th thresholds) unitReport {
 	r := unitReport{Name: u.Name, Notes: u.Notes}
+	fail := func(msg string) unitReport {
+		return unitReport{Name: u.Name, Notes: u.Notes, Error: msg, Failing: true}
+	}
 	accepted := map[string]bool{}
 	for _, a := range u.Accepted {
-		accepted[a] = true
+		accepted[a] = false // false until the matching flag fires
 	}
-	flag := func(id, msg string) {
-		if accepted[id] {
+	flag := func(key, msg string) {
+		if _, ok := accepted[key]; ok {
+			accepted[key] = true
 			r.Flags = append(r.Flags, msg+" (accepted)")
 			return
 		}
@@ -295,24 +353,67 @@ func evaluate(u unit, answers map[string]map[string]any, th thresholds) unitRepo
 	}
 	for i, behavior := range u.Behaviors {
 		id := fmt.Sprintf("covers_%02d", i)
-		p := num(answers[id]["noul"])
+		p, err := numField(answers, id, "noul")
+		if err != nil {
+			return fail(err.Error())
+		}
 		r.Behaviors = append(r.Behaviors, behaviorResult{ID: id, Behavior: behavior, Covered: p})
 		if p < th.minCover {
-			flag(id, fmt.Sprintf("%s: coverage %.2f < %.2f for %q", id, p, th.minCover, behavior))
+			// Coverage acceptances are keyed by behavior text, so renumbering
+			// the behaviors cannot move an acceptance to another claim.
+			flag(behavior, fmt.Sprintf("%s: coverage %.2f < %.2f for %q", id, p, th.minCover, behavior))
 		}
 	}
-	r.Contradicts = num(answers["contradicts_spec"]["noul"])
+	contradicts, err := numField(answers, "contradicts_spec", "noul")
+	if err != nil {
+		return fail(err.Error())
+	}
+	r.Contradicts = contradicts
 	if r.Contradicts > th.maxContradict {
 		flag("contradicts_spec", fmt.Sprintf("contradicts_spec: %.2f > %.2f", r.Contradicts, th.maxContradict))
 	}
-	r.Thoroughness = num(answers["thoroughness"]["score"])
+	thorough, err := numField(answers, "thoroughness", "score")
+	if err != nil {
+		return fail(err.Error())
+	}
+	r.Thoroughness = thorough
 	r.ThoroughConf = num(answers["thoroughness"]["confidence"])
 	if r.Thoroughness < th.minThorough {
 		flag("thoroughness", fmt.Sprintf("thoroughness: %.2f < %.2f", r.Thoroughness, th.minThorough))
 	}
-	r.Weakest, _ = answers["weakest_area"]["choice"].(string)
+	weakest, ok := answers["weakest_area"]["choice"].(string)
+	if !ok {
+		return fail(`answer "weakest_area" is missing a string "choice" field`)
+	}
+	r.Weakest = weakest
 	r.WeakestConf = num(answers["weakest_area"]["confidence"])
+
+	for _, a := range u.Accepted {
+		if !accepted[a] {
+			r.StaleAcceptances = append(r.StaleAcceptances, a)
+		}
+	}
+	sort.Strings(r.StaleAcceptances)
 	return r
+}
+
+// numField reads a numeric field of one answer. A missing answer or a
+// non-numeric value is an error rather than a silent zero, which would look
+// like a confident "no".
+func numField(answers map[string]map[string]any, id, field string) (float64, error) {
+	a, ok := answers[id]
+	if !ok {
+		return 0, fmt.Errorf("answer %q is missing from the response", id)
+	}
+	v, ok := a[field]
+	if !ok {
+		return 0, fmt.Errorf("answer %q is missing its %q field", id, field)
+	}
+	f, ok := v.(float64)
+	if !ok {
+		return 0, fmt.Errorf("answer %q has a non-numeric %q field (%T)", id, field, v)
+	}
+	return f, nil
 }
 
 func num(v any) float64 {
@@ -320,13 +421,13 @@ func num(v any) float64 {
 	return f
 }
 
-func markdown(reports []unitReport) string {
+func markdown(reports []unitReport, th thresholds) string {
 	var b strings.Builder
 	b.WriteString("# Self-review\n\n| Unit | Behaviors covered | Contradicts | Thoroughness | Weakest | Flags |\n|---|---|---|---|---|---|\n")
 	for _, r := range reports {
 		covered := 0
 		for _, br := range r.Behaviors {
-			if br.Covered >= 0.6 {
+			if br.Covered >= th.minCover {
 				covered++
 			}
 		}
@@ -345,7 +446,7 @@ func markdown(reports []unitReport) string {
 			fmt.Fprintf(&b, "## %s\n\nerror: %s\n\n", r.Name, r.Error)
 			continue
 		}
-		if len(r.Flags) == 0 {
+		if len(r.Flags) == 0 && len(r.StaleAcceptances) == 0 {
 			continue
 		}
 		fmt.Fprintf(&b, "## %s\n\n", r.Name)
@@ -362,6 +463,9 @@ func markdown(reports []unitReport) string {
 		sort.Strings(flags)
 		for _, f := range flags {
 			b.WriteString("- " + f + "\n")
+		}
+		for _, a := range r.StaleAcceptances {
+			b.WriteString("- acceptance did not fire: " + a + "\n")
 		}
 		b.WriteString("\n")
 	}

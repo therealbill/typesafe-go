@@ -17,7 +17,7 @@
         "Instructions that are a number fail validation naming the instructions path",
         "Pointers to Noul, Choice, and Score are accepted as questions"
       ],
-      "accepted": ["contradicts_spec", "covers_00"],
+      "accepted": ["contradicts_spec", "Noul.Criteria is omitted from the wire JSON when nil"],
       "notes": [
         "contradicts_spec: 0.44–0.49 across three runs with unrelated input changes; no spec/code conflict found on review",
         "covers_00: 0.52–0.68 across five runs on byte-identical input; question_test.go pins it in the noul plain and noul no instructions cases and in TestNoulCriteriaOmittedWhenNil"

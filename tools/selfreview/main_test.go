@@ -62,7 +62,7 @@ func TestBundleTruncates(t *testing.T) {
 }
 
 func TestEvaluate(t *testing.T) {
-	u := unit{Name: "x", Behaviors: []string{"b0", "b1"}, Accepted: []string{"covers_01"}, Notes: []string{"covers_01: known noise"}}
+	u := unit{Name: "x", Behaviors: []string{"b0", "b1"}, Accepted: []string{"b1"}, Notes: []string{"b1: known noise"}}
 	ans := map[string]map[string]any{
 		"covers_00":        {"type": "noul", "noul": 0.9},
 		"covers_01":        {"type": "noul", "noul": 0.2},
@@ -77,12 +77,108 @@ func TestEvaluate(t *testing.T) {
 	if r.Failing {
 		t.Fatal("an accepted flag must not fail the unit")
 	}
-	if len(r.Notes) != 1 || r.Notes[0] != "covers_01: known noise" {
+	if len(r.Notes) != 1 || r.Notes[0] != "b1: known noise" {
 		t.Fatalf("notes must travel into the report so an acceptance carries its rationale, got %v", r.Notes)
 	}
 	ans["contradicts_spec"]["noul"] = 0.7
 	r = evaluate(u, ans, thresholds{minCover: 0.6, maxContradict: 0.4, minThorough: 2.0})
 	if !r.Failing || len(r.Flags) != 2 {
 		t.Fatalf("contradiction should fail: %+v", r)
+	}
+}
+
+func TestExtractSectionIgnoresFencedHeadings(t *testing.T) {
+	spec := "## One\n\ntext\n\n```sh\n# comment that is not a heading\n## also not a heading\n```\n\nmore text\n\n## Two\n\nother\n"
+	got, err := extractSection(spec, "## One")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(got, "# comment that is not a heading") {
+		t.Fatalf("a fenced comment must stay inside the section: %q", got)
+	}
+	if !strings.Contains(got, "more text") {
+		t.Fatalf("the section must continue past the fence: %q", got)
+	}
+	if strings.Contains(got, "other") {
+		t.Fatalf("the section must still stop at the next real heading: %q", got)
+	}
+}
+
+func TestValidateUnitsRejectsPositionalAcceptance(t *testing.T) {
+	cfg := config{Units: []unit{{Name: "x", Behaviors: []string{"b0"}, Accepted: []string{"covers_00"}}}}
+	err := validateUnits(cfg)
+	if err == nil {
+		t.Fatal("a positional covers_NN acceptance must be rejected")
+	}
+	if !strings.Contains(err.Error(), "covers_00") || !strings.Contains(err.Error(), "x") {
+		t.Fatalf("the error should name the unit and the entry: %v", err)
+	}
+	ok := config{Units: []unit{{Name: "x", Behaviors: []string{"b0"}, Accepted: []string{"b0", "thoroughness"}}}}
+	if err := validateUnits(ok); err != nil {
+		t.Fatalf("behavior text and question ids are both valid: %v", err)
+	}
+}
+
+func TestEvaluateReportsStaleAcceptance(t *testing.T) {
+	u := unit{Name: "x", Behaviors: []string{"b0"}, Accepted: []string{"b0", "thoroughness"}}
+	ans := map[string]map[string]any{
+		"covers_00":        {"noul": 0.9},
+		"contradicts_spec": {"noul": 0.1},
+		"thoroughness":     {"score": 2.5, "confidence": 0.8},
+		"weakest_area":     {"choice": "retry", "confidence": 0.6},
+	}
+	r := evaluate(u, ans, thresholds{minCover: 0.6, maxContradict: 0.4, minThorough: 2.0})
+	if r.Failing {
+		t.Fatalf("nothing should fail: %+v", r)
+	}
+	if len(r.StaleAcceptances) != 2 {
+		t.Fatalf("both unused acceptances should be reported, got %v", r.StaleAcceptances)
+	}
+	out := markdown([]unitReport{r}, thresholds{minCover: 0.6})
+	if !strings.Contains(out, "acceptance did not fire: b0") {
+		t.Fatalf("stale acceptances must appear in the summary:\n%s", out)
+	}
+}
+
+func TestEvaluateMissingOrNonNumericAnswerIsError(t *testing.T) {
+	u := unit{Name: "x", Behaviors: []string{"b0"}}
+	th := thresholds{minCover: 0.6, maxContradict: 0.4, minThorough: 2.0}
+	full := func() map[string]map[string]any {
+		return map[string]map[string]any{
+			"covers_00":        {"noul": 0.9},
+			"contradicts_spec": {"noul": 0.1},
+			"thoroughness":     {"score": 2.5, "confidence": 0.8},
+			"weakest_area":     {"choice": "retry", "confidence": 0.6},
+		}
+	}
+	if r := evaluate(u, full(), th); r.Error != "" {
+		t.Fatalf("a complete answer set must not error: %q", r.Error)
+	}
+	for _, drop := range []string{"covers_00", "contradicts_spec", "thoroughness", "weakest_area"} {
+		ans := full()
+		delete(ans, drop)
+		r := evaluate(u, ans, th)
+		if r.Error == "" || !r.Failing {
+			t.Errorf("a missing %s must be a unit error, got %+v", drop, r)
+		}
+	}
+	ans := full()
+	ans["thoroughness"]["score"] = "high"
+	r := evaluate(u, ans, th)
+	if r.Error == "" || !r.Failing {
+		t.Errorf("a non-numeric score must be a unit error, got %+v", r)
+	}
+}
+
+func TestMarkdownUsesMinCoverThreshold(t *testing.T) {
+	r := unitReport{Name: "x", Behaviors: []behaviorResult{
+		{ID: "covers_00", Covered: 0.65},
+		{ID: "covers_01", Covered: 0.80},
+	}}
+	if out := markdown([]unitReport{r}, thresholds{minCover: 0.6}); !strings.Contains(out, "2/2") {
+		t.Fatalf("both behaviors clear 0.6:\n%s", out)
+	}
+	if out := markdown([]unitReport{r}, thresholds{minCover: 0.7}); !strings.Contains(out, "1/2") {
+		t.Fatalf("only one behavior clears 0.7:\n%s", out)
 	}
 }
