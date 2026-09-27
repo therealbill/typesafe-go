@@ -235,11 +235,12 @@ func TestSystemOneBudgetExhausted(t *testing.T) {
 }
 
 func TestSystemOneContextCancelledDuringBackoff(t *testing.T) {
-	fs := newFakeServer(t, step{status: 503, body: `down`})
+	fs := newFakeServer(t, step{status: 503, body: `down`, headers: map[string]string{"x-typesafe-request-id": "req_cancel"}})
 	p := fastPolicy()
 	p.InitialDelay = time.Second
 	p.MaxDelay = time.Second
-	c := newTestClient(t, fs.URL, WithRetryPolicy(p))
+	fi := &fakeInstrumentation{}
+	c := newTestClient(t, fs.URL, WithRetryPolicy(p), WithInstrumentation(fi))
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
 		time.Sleep(20 * time.Millisecond)
@@ -255,6 +256,16 @@ func TestSystemOneContextCancelledDuringBackoff(t *testing.T) {
 	}
 	if fs.callCount() != 1 {
 		t.Fatalf("calls %d", fs.callCount())
+	}
+	if len(fi.results) != 1 {
+		t.Fatalf("instrumentation should record exactly one result, got %d", len(fi.results))
+	}
+	r := fi.results[0]
+	if r.Status != 503 || r.RequestID != "req_cancel" {
+		t.Fatalf("a cancelled backoff must still report the last response: %+v", r)
+	}
+	if !errors.Is(r.Err, context.Canceled) {
+		t.Fatalf("recorded error should wrap context.Canceled, got %v", r.Err)
 	}
 }
 
@@ -383,7 +394,7 @@ func TestNewClientEnvAndDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.apiKey != "env-key" || c.baseURL != "https://example.test" || c.model != "jev-preview" || c.timeout != DefaultTimeout {
+	if c.apiKey != "env-key" || c.baseURL.String() != "https://example.test" || c.model != "jev-preview" || c.timeout != DefaultTimeout {
 		t.Fatalf("client %+v", c)
 	}
 	t.Setenv(EnvBaseURL, "")
@@ -392,7 +403,7 @@ func TestNewClientEnvAndDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.baseURL != DefaultBaseURL || c.model != DefaultModel {
+	if c.baseURL.String() != DefaultBaseURL || c.model != DefaultModel {
 		t.Fatalf("defaults %+v", c)
 	}
 	if _, err := NewClient(WithAPIKey("k"), WithBaseURL("://bad")); err == nil {
@@ -531,5 +542,116 @@ func TestSystemOneNonFiniteRetryAfterDoesNotHang(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("SystemOne did not return within 2s: a non-finite Retry-After hung the retry loop")
+	}
+}
+
+func TestSystemOneRequestRetryOption(t *testing.T) {
+	fs := newFakeServer(t, step{status: 503, body: `down`})
+	c := newTestClient(t, fs.URL)
+	p := fastPolicy()
+	p.MaxRetries = 0
+	_, err := c.SystemOne(context.Background(), fixtureState, fixtureQuestions, WithRequestRetry(p))
+	var api *APIError
+	if !errors.As(err, &api) || api.Status != 503 {
+		t.Fatalf("err %v", err)
+	}
+	if fs.callCount() != 1 {
+		t.Fatalf("a per-call MaxRetries of 0 must disable retries, calls %d", fs.callCount())
+	}
+}
+
+func TestSystemOneRequestTimeoutOption(t *testing.T) {
+	fs := newFakeServer(t, step{status: 200, body: `{}`, delay: 200 * time.Millisecond})
+	p := fastPolicy()
+	p.MaxRetries = 0
+	c := newTestClient(t, fs.URL, WithRetryPolicy(p))
+	_, err := c.SystemOne(context.Background(), fixtureState, fixtureQuestions, WithRequestTimeout(20*time.Millisecond))
+	var te *TimeoutError
+	if !errors.As(err, &te) || te.Timeout != 20*time.Millisecond {
+		t.Fatalf("err %v", err)
+	}
+}
+
+func TestRequestTimeoutRejectsNegative(t *testing.T) {
+	fs := newFakeServer(t, okStep(t))
+	c := newTestClient(t, fs.URL)
+	_, err := c.SystemOne(context.Background(), fixtureState, fixtureQuestions, WithRequestTimeout(-time.Second))
+	var ve *ValidationError
+	if !errors.As(err, &ve) || ve.Path != "timeout" {
+		t.Fatalf("err %v", err)
+	}
+	if fs.callCount() != 0 {
+		t.Fatal("a rejected option must not reach the network")
+	}
+	if _, err := c.ListModels(context.Background(), WithRequestTimeout(-time.Second)); !errors.As(err, &ve) {
+		t.Fatalf("ListModels should reject it too, got %v", err)
+	}
+}
+
+func TestNewClientRejectsUnusableBaseURL(t *testing.T) {
+	for _, raw := range []string{"https://x/?tenant=1", "https://x/#frag", "https://u:p@x", "ftp://x", "://bad", "/no/scheme"} {
+		if _, err := NewClient(WithAPIKey("k"), WithBaseURL(raw)); err == nil {
+			t.Errorf("base URL %q should be rejected", raw)
+		}
+	}
+}
+
+func TestBaseURLPathPrefixIsKept(t *testing.T) {
+	fs := newFakeServer(t, okStep(t))
+	c := newTestClient(t, fs.URL+"/typesafe/")
+	if _, err := c.SystemOne(context.Background(), fixtureState, fixtureQuestions); err != nil {
+		t.Fatal(err)
+	}
+	if got := fs.requests[0].URL.Path; got != "/typesafe/v1/systemone" {
+		t.Fatalf("gateway path prefix lost: got %q", got)
+	}
+}
+
+func TestInstrumentationRecordsValidationError(t *testing.T) {
+	fs := newFakeServer(t, okStep(t))
+	fi := &fakeInstrumentation{}
+	c := newTestClient(t, fs.URL, WithInstrumentation(fi))
+	_, err := c.SystemOne(context.Background(), fixtureState, Questions{})
+	var ve *ValidationError
+	if !errors.As(err, &ve) {
+		t.Fatalf("err %v", err)
+	}
+	if len(fi.infos) != 1 {
+		t.Fatalf("RequestStart must run once per call, got %d", len(fi.infos))
+	}
+	if len(fi.results) != 1 {
+		t.Fatalf("a validation failure must be recorded, got %d results", len(fi.results))
+	}
+	if fi.results[0].Attempts != 0 || !errors.As(fi.results[0].Err, &ve) {
+		t.Fatalf("result %+v", fi.results[0])
+	}
+	if fs.callCount() != 0 {
+		t.Fatal("no request should be sent")
+	}
+}
+
+type panicRoundTripper struct{}
+
+func (panicRoundTripper) RoundTrip(*http.Request) (*http.Response, error) {
+	panic("round tripper exploded")
+}
+
+func TestInstrumentationRecordsPanic(t *testing.T) {
+	fs := newFakeServer(t, okStep(t))
+	fi := &fakeInstrumentation{}
+	c := newTestClient(t, fs.URL, WithHTTPClient(&http.Client{Transport: panicRoundTripper{}}), WithInstrumentation(fi))
+	func() {
+		defer func() {
+			if r := recover(); r == nil {
+				t.Error("the panic must propagate to the caller")
+			}
+		}()
+		_, _ = c.SystemOne(context.Background(), fixtureState, fixtureQuestions)
+	}()
+	if len(fi.results) != 1 {
+		t.Fatalf("a panic must record exactly one result, got %d", len(fi.results))
+	}
+	if fi.results[0].Err == nil || !strings.Contains(fi.results[0].Err.Error(), "panic") {
+		t.Fatalf("result %+v", fi.results[0])
 	}
 }

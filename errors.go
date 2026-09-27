@@ -63,24 +63,25 @@ func (e *APIError) Message() string {
 		Message string          `json:"message"`
 		Error   string          `json:"error"`
 	}
+	var msg string
 	if json.Unmarshal(e.Body, &env) == nil {
 		if len(env.Detail) > 0 {
-			if msg := detailMessage(env.Detail); msg != "" {
-				return msg
-			}
+			msg = detailMessage(env.Detail)
 		}
-		if env.Message != "" {
-			return env.Message
+		if msg == "" {
+			msg = env.Message
 		}
-		if env.Error != "" {
-			return env.Error
+		if msg == "" {
+			msg = env.Error
 		}
 	}
-	s := strings.TrimSpace(string(e.Body))
-	if len(s) > maxMessageLen {
-		s = s[:maxMessageLen] + "..."
+	if msg == "" {
+		msg = strings.TrimSpace(string(e.Body))
 	}
-	return s
+	if len(msg) > maxMessageLen {
+		msg = msg[:maxMessageLen] + "..."
+	}
+	return msg
 }
 
 func detailMessage(raw json.RawMessage) string {

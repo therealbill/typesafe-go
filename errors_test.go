@@ -25,6 +25,8 @@ func TestAPIErrorMessage(t *testing.T) {
 		{"plain text", `  service unavailable  `, "service unavailable"},
 		{"empty", ``, ""},
 		{"long text", strings.Repeat("x", 300), strings.Repeat("x", 200) + "..."},
+		{"long detail message", `{"detail":{"error_type":"authentication_error","message":"` + strings.Repeat("x", 500) + `"}}`,
+			("authentication_error: " + strings.Repeat("x", 500))[:200] + "..."},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

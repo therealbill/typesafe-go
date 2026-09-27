@@ -50,7 +50,9 @@ func (c *Client) send(ctx context.Context, method, path string, body []byte, ext
 		}
 		c.logger.Warn("typesafe retrying", "endpoint", endpoint, "attempt", retry+1, "delay", delay, "error", err)
 		if serr := sleep(ctx, delay); serr != nil {
-			return nil, nil, retry + 1, &ConnectionError{Err: serr}
+			// Keep the last response so instrumentation still sees the
+			// status and request id that prompted the abandoned retry.
+			return resp, respBody, retry + 1, &ConnectionError{Err: serr}
 		}
 	}
 }
@@ -68,7 +70,7 @@ func (c *Client) attempt(ctx context.Context, method, path string, body []byte, 
 	if body != nil {
 		rdr = bytes.NewReader(body)
 	}
-	req, err := http.NewRequestWithContext(actx, method, c.baseURL+path, rdr)
+	req, err := http.NewRequestWithContext(actx, method, c.baseURL.JoinPath(path).String(), rdr)
 	if err != nil {
 		return nil, nil, &ConnectionError{Err: err}
 	}

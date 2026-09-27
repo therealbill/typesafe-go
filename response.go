@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"sort"
 )
 
 // Answer is one decoded answer: NoulAnswer, ChoiceAnswer, ScoreAnswer, or
@@ -134,8 +135,15 @@ func decodeSystemOne(body []byte) (*SystemOneResponse, error) {
 		return nil, fieldErr("", err)
 	}
 	res := &SystemOneResponse{Model: w.Model, Usage: w.Usage, RequestID: w.RequestID, Answers: make(map[string]Answer, len(w.Answers))}
-	for key, raw := range w.Answers {
-		a, err := decodeAnswer(joinPath("answers", key), raw)
+	// Decode in key order so a response with more than one bad answer always
+	// reports the same field path.
+	keys := make([]string, 0, len(w.Answers))
+	for key := range w.Answers {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		a, err := decodeAnswer(joinPath("answers", key), w.Answers[key])
 		if err != nil {
 			return nil, err
 		}
@@ -242,6 +250,20 @@ func (a ChoiceAnswer) MarshalJSON() ([]byte, error) {
 // MarshalJSON encodes the answer with its wire "type".
 func (a ScoreAnswer) MarshalJSON() ([]byte, error) {
 	return json.Marshal(map[string]any{"type": "score", "score": a.Score, "confidence": a.Confidence, "legend": a.Legend, "probabilities": a.Probabilities})
+}
+
+// UnmarshalJSON records the answer's type and keeps the raw bytes so the
+// answer survives a marshal unchanged.
+func (a *UnknownAnswer) UnmarshalJSON(b []byte) error {
+	var head struct {
+		Type string `json:"type"`
+	}
+	if err := json.Unmarshal(b, &head); err != nil {
+		return fieldErr("", err)
+	}
+	a.Type = head.Type
+	a.Raw = append(json.RawMessage(nil), b...)
+	return nil
 }
 
 // MarshalJSON returns the raw answer unchanged.

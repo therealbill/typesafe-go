@@ -199,3 +199,37 @@ func TestUnknownAnswerMarshalRoundTrip(t *testing.T) {
 		t.Fatalf("unknown answer lost its fields through marshal: %s", out)
 	}
 }
+
+func TestDecodeAnswerErrorPathIsStable(t *testing.T) {
+	// Two answers are both malformed. Map iteration order must not decide
+	// which one is reported, or the same response yields different errors.
+	body := []byte(`{"answers":{"a":{"type":"noul"},"b":{"type":"noul"}}}`)
+	for i := 0; i < 50; i++ {
+		_, err := decodeSystemOne(body)
+		var rve *ResponseValidationError
+		if !errors.As(err, &rve) {
+			t.Fatalf("want *ResponseValidationError, got %v", err)
+		}
+		if rve.FieldPath != "answers.a.noul" {
+			t.Fatalf("iteration %d reported %q; the lowest key must win every time", i, rve.FieldPath)
+		}
+	}
+}
+
+func TestUnknownAnswerRoundTripsThroughUnmarshal(t *testing.T) {
+	raw := `{"type":"vibe","vibe":"good","extra":[1,2]}`
+	var a UnknownAnswer
+	if err := json.Unmarshal([]byte(raw), &a); err != nil {
+		t.Fatal(err)
+	}
+	if a.Type != "vibe" {
+		t.Fatalf("type %q", a.Type)
+	}
+	out, err := json.Marshal(a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(out) != raw {
+		t.Fatalf("round trip changed the bytes\n got %s\nwant %s", out, raw)
+	}
+}

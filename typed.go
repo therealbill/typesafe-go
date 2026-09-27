@@ -19,23 +19,33 @@ import (
 // lost. On a request error the response is nil. On a decode error the
 // response is returned with the error.
 func SystemOneAs[T any](ctx context.Context, c *Client, state any, questions Questions, opts ...RequestOption) (T, *SystemOneResponse, error) {
-	var out T
 	res, err := c.SystemOne(ctx, state, questions, opts...)
 	if err != nil {
+		var out T
 		return out, nil, err
+	}
+	out, err := answersInto[T](res)
+	return out, res, err
+}
+
+// answersInto decodes the answers object of a response into T.
+func answersInto[T any](res *SystemOneResponse) (T, error) {
+	var out T
+	if res == nil || res.Raw == nil {
+		return out, &ResponseValidationError{FieldPath: "answers", Err: errors.New("raw response body unavailable")}
 	}
 	var w struct {
 		Answers json.RawMessage `json:"answers"`
 	}
 	if err := json.Unmarshal(res.Raw.Body, &w); err != nil {
-		return out, res, fieldErr("answers", err)
+		return out, fieldErr("answers", err)
 	}
 	if err := json.Unmarshal(w.Answers, &out); err != nil {
 		var rve *ResponseValidationError
 		if errors.As(err, &rve) {
-			return out, res, err
+			return out, err
 		}
-		return out, res, fieldErr("answers", err)
+		return out, fieldErr("answers", err)
 	}
-	return out, res, nil
+	return out, nil
 }

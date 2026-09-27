@@ -3,6 +3,7 @@ package typesafe
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 )
 
@@ -75,5 +76,19 @@ func TestSystemOneAsMissingKeyIsZero(t *testing.T) {
 	}
 	if got.AbsentP != nil {
 		t.Fatalf("absent pointer field should stay nil, got %+v", got.AbsentP)
+	}
+}
+
+func TestAnswersIntoRequiresRawBody(t *testing.T) {
+	_, err := answersInto[triage](&SystemOneResponse{})
+	var rve *ResponseValidationError
+	if !errors.As(err, &rve) {
+		t.Fatalf("want *ResponseValidationError, got %v", err)
+	}
+	if rve.FieldPath != "answers" {
+		t.Fatalf("field path %q", rve.FieldPath)
+	}
+	if !strings.Contains(rve.Err.Error(), "raw response body unavailable") {
+		t.Fatalf("message %q", rve.Err.Error())
 	}
 }

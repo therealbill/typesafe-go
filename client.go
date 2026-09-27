@@ -3,6 +3,7 @@ package typesafe
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -11,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -30,7 +32,7 @@ const (
 // Client calls the TypeSafe API. It is safe for concurrent use.
 type Client struct {
 	apiKey     string
-	baseURL    string
+	baseURL    *url.URL
 	model      string
 	retry      RetryPolicy
 	timeout    time.Duration
@@ -135,7 +137,7 @@ func NewClient(opts ...Option) (*Client, error) {
 	if c.apiKey == "" {
 		return nil, ErrMissingAPIKey
 	}
-	if c.baseURL == "" {
+	if c.baseURL == nil {
 		raw := os.Getenv(EnvBaseURL)
 		if raw == "" {
 			raw = DefaultBaseURL
@@ -169,12 +171,28 @@ func NewClient(opts ...Option) (*Client, error) {
 	return c, nil
 }
 
-func normalizeBaseURL(raw string) (string, error) {
+// normalizeBaseURL parses the API root. Only http and https are accepted, and
+// a query, fragment, or embedded credentials are rejected: they would be
+// silently dropped when the request path is appended.
+func normalizeBaseURL(raw string) (*url.URL, error) {
 	u, err := url.Parse(raw)
-	if err != nil || u.Scheme == "" || u.Host == "" {
-		return "", fmt.Errorf("typesafe: invalid base URL %q", raw)
+	if err != nil {
+		return nil, fmt.Errorf("typesafe: invalid base URL %q: %w", raw, err)
 	}
-	return strings.TrimRight(raw, "/"), nil
+	switch {
+	case u.Scheme != "http" && u.Scheme != "https":
+		return nil, fmt.Errorf("typesafe: invalid base URL %q: scheme must be http or https", raw)
+	case u.Host == "":
+		return nil, fmt.Errorf("typesafe: invalid base URL %q: missing host", raw)
+	case u.RawQuery != "" || u.ForceQuery:
+		return nil, fmt.Errorf("typesafe: invalid base URL %q: must not carry a query", raw)
+	case u.Fragment != "":
+		return nil, fmt.Errorf("typesafe: invalid base URL %q: must not carry a fragment", raw)
+	case u.User != nil:
+		return nil, fmt.Errorf("typesafe: invalid base URL %q: must not carry credentials", raw)
+	}
+	u.Path = strings.TrimRight(u.Path, "/")
+	return u, nil
 }
 
 // NewLogger returns a text logger on w at the named level: debug, info,
@@ -213,59 +231,89 @@ type requestConfig struct {
 	extraBody map[string]any
 }
 
-// RequestOption configures a single call.
-type RequestOption func(*requestConfig)
+// RequestOption configures a single call. An option that cannot be applied
+// returns an error, which the call returns before contacting the API.
+type RequestOption func(*requestConfig) error
 
 // WithRequestModel overrides the client's model for this call.
 func WithRequestModel(m string) RequestOption {
-	return func(rc *requestConfig) { rc.model = m }
+	return func(rc *requestConfig) error { rc.model = m; return nil }
 }
 
 // WithRequestRetry overrides the retry policy for this call.
 func WithRequestRetry(p RetryPolicy) RequestOption {
-	return func(rc *requestConfig) { rc.retry = p }
+	return func(rc *requestConfig) error { rc.retry = p; return nil }
 }
 
-// WithRequestTimeout overrides the per-attempt timeout for this call.
+// WithRequestTimeout overrides the per-attempt timeout for this call. Zero
+// disables the per-attempt timeout; a negative value is an error.
 func WithRequestTimeout(d time.Duration) RequestOption {
-	return func(rc *requestConfig) { rc.timeout = d }
+	return func(rc *requestConfig) error {
+		if d < 0 {
+			return &ValidationError{Path: "timeout", Err: errors.New("timeout must not be negative")}
+		}
+		rc.timeout = d
+		return nil
+	}
 }
 
 // WithExtraHeaders adds headers to this call, replacing client headers with
 // the same name.
 func WithExtraHeaders(h http.Header) RequestOption {
-	return func(rc *requestConfig) { rc.headers = h.Clone() }
+	return func(rc *requestConfig) error { rc.headers = h.Clone(); return nil }
 }
 
 // WithExtraBody merges fields into the top level of the request body. Use it
 // for API fields this package does not model yet.
 func WithExtraBody(fields map[string]any) RequestOption {
-	return func(rc *requestConfig) { rc.extraBody = fields }
+	return func(rc *requestConfig) error { rc.extraBody = fields; return nil }
 }
 
-func (c *Client) requestConfig(opts []RequestOption) requestConfig {
+func (c *Client) requestConfig(opts []RequestOption) (requestConfig, error) {
 	rc := requestConfig{model: c.model, retry: c.retry, timeout: c.timeout}
 	for _, o := range opts {
-		o(&rc)
+		if err := o(&rc); err != nil {
+			return rc, err
+		}
 	}
-	return rc
+	return rc, nil
 }
 
+// startInstrument opens the instrumentation span for one call. The returned
+// finish function runs at most once, so the normal path and the panic guard
+// cannot both report a result.
 func (c *Client) startInstrument(ctx context.Context, info RequestInfo) (context.Context, func(RequestResult)) {
 	if c.instr == nil {
 		return ctx, func(RequestResult) {}
 	}
-	return c.instr.RequestStart(ctx, info)
+	ctx, done := c.instr.RequestStart(ctx, info)
+	var once sync.Once
+	return ctx, func(r RequestResult) { once.Do(func() { done(r) }) }
 }
 
 // SystemOne asks the named questions about state and returns the typed
 // answers. state is a string, map, slice, or struct that encodes to JSON.
 func (c *Client) SystemOne(ctx context.Context, state any, questions Questions, opts ...RequestOption) (*SystemOneResponse, error) {
-	rc := c.requestConfig(opts)
+	rc, err := c.requestConfig(opts)
+	if err != nil {
+		return nil, err
+	}
+	info := RequestInfo{Operation: "system_one", Model: rc.model, State: state, Questions: questions}
+	info.QuestionCount, info.NoulCount, info.ChoiceCount, info.ScoreCount = countQuestions(questions)
+	ctx, finish := c.startInstrument(ctx, info)
+	defer func() {
+		if r := recover(); r != nil {
+			finish(RequestResult{Err: fmt.Errorf("panic: %v", r)})
+			panic(r)
+		}
+	}()
+
 	if err := validateContent("state", state, false); err != nil {
+		finish(RequestResult{Err: err})
 		return nil, err
 	}
 	if err := validateQuestions(questions); err != nil {
+		finish(RequestResult{Err: err})
 		return nil, err
 	}
 	body := map[string]any{"state": state, "model": rc.model, "questions": questions}
@@ -274,11 +322,10 @@ func (c *Client) SystemOne(ctx context.Context, state any, questions Questions, 
 	}
 	payload, err := json.Marshal(body)
 	if err != nil {
-		return nil, &ValidationError{Path: "body", Err: err}
+		verr := &ValidationError{Path: "body", Err: err}
+		finish(RequestResult{Err: verr})
+		return nil, verr
 	}
-	info := RequestInfo{Operation: "system_one", Model: rc.model, State: state, Questions: questions}
-	info.QuestionCount, info.NoulCount, info.ChoiceCount, info.ScoreCount = countQuestions(questions)
-	ctx, finish := c.startInstrument(ctx, info)
 
 	resp, raw, attempts, err := c.send(ctx, http.MethodPost, "/v1/systemone", payload, rc.headers, rc.retry, rc.timeout)
 	if err != nil {
@@ -298,8 +345,17 @@ func (c *Client) SystemOne(ctx context.Context, state any, questions Questions, 
 
 // ListModels returns the models available to the account.
 func (c *Client) ListModels(ctx context.Context, opts ...RequestOption) (*ListModelsResponse, error) {
-	rc := c.requestConfig(opts)
+	rc, err := c.requestConfig(opts)
+	if err != nil {
+		return nil, err
+	}
 	ctx, finish := c.startInstrument(ctx, RequestInfo{Operation: "list_models", Model: rc.model})
+	defer func() {
+		if r := recover(); r != nil {
+			finish(RequestResult{Err: fmt.Errorf("panic: %v", r)})
+			panic(r)
+		}
+	}()
 	resp, raw, attempts, err := c.send(ctx, http.MethodGet, "/v1/models", nil, rc.headers, rc.retry, rc.timeout)
 	if err != nil {
 		finish(RequestResult{Attempts: attempts, Status: statusOf(resp), RequestID: requestIDOf(resp), Err: err})
