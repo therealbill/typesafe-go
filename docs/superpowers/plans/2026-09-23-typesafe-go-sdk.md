@@ -5459,7 +5459,7 @@ Skip the commit if there were no changes. Report "Task 19 done, CLI ready" to th
 
 The tool reads `units.json`, extracts each unit's spec section, bundles it with the implementation and test sources as state, asks Jev one request per unit through `jev ask` (JSON on stdin), evaluates thresholds, writes `selfreview-report.json`, prints a Markdown summary, and exits 1 when any unit is flagged and not accepted.
 
-- [ ] **Step 1: Write `tools/selfreview/units.json`**
+- [x] **Step 1: Write `tools/selfreview/units.json`**
 
 ```json
 {
@@ -5602,7 +5602,7 @@ The tool reads `units.json`, extracts each unit's spec section, bundles it with 
 }
 ```
 
-- [ ] **Step 2: Write the failing tests `tools/selfreview/main_test.go`**
+- [x] **Step 2: Write the failing tests `tools/selfreview/main_test.go`**
 
 ```go
 package main
@@ -5683,14 +5683,14 @@ func TestEvaluate(t *testing.T) {
 }
 ```
 
-- [ ] **Step 3: Run tests to verify they fail**
+- [x] **Step 3: Run tests to verify they fail**
 
 ```bash
 go test ./tools/selfreview/ 2>&1 | head -3
 ```
 Expected: undefined `extractSection`, `unit`, and friends.
 
-- [ ] **Step 4: Write `tools/selfreview/main.go`**
+- [x] **Step 4: Write `tools/selfreview/main.go`**
 
 ```go
 // Command selfreview asks Jev, through the jev CLI, whether each unit's tests
