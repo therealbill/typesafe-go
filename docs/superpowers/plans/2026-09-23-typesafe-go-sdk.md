@@ -252,6 +252,7 @@ Expected: no gofmt output, no vet errors, clean build.
 **Files:**
 - Create: `question.go`, `question_test.go`
 - Create: `errors.go` (only `ValidationError`, the rest comes in Task 3)
+- Modify: `response.go` (delete the temporary `Question` and `Questions` placeholders added in Task 1 so `instrument.go` compiled; Task 4 replaces the file)
 
 - [ ] **Step 1: Write `errors.go` with just `ValidationError`**
 
