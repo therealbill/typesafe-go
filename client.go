@@ -1,0 +1,355 @@
+package typesafe
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"log/slog"
+	"math/rand/v2"
+	"net/http"
+	"net/url"
+	"os"
+	"strings"
+	"time"
+)
+
+// Defaults and environment variable names. Explicit options win over the
+// environment, which wins over these defaults.
+const (
+	DefaultBaseURL = "https://api.typesafe.ai"
+	DefaultModel   = "jev-latest"
+	DefaultTimeout = 10 * time.Second
+
+	EnvAPIKey       = "TYPESAFE_API_KEY"
+	EnvBaseURL      = "TYPESAFE_BASE_URL"
+	EnvDefaultModel = "TYPESAFE_DEFAULT_MODEL"
+	EnvLogLevel     = "TYPESAFE_LOG_LEVEL"
+)
+
+// Client calls the TypeSafe API. It is safe for concurrent use.
+type Client struct {
+	apiKey     string
+	baseURL    string
+	model      string
+	retry      RetryPolicy
+	timeout    time.Duration
+	headers    http.Header
+	httpClient *http.Client
+	ownsHTTP   bool
+	instr      Instrumentation
+	logger     *slog.Logger
+	random     func() float64
+}
+
+// Option configures a Client.
+type Option func(*Client) error
+
+// WithAPIKey sets the API key. Otherwise TYPESAFE_API_KEY is used.
+func WithAPIKey(key string) Option {
+	return func(c *Client) error { c.apiKey = key; return nil }
+}
+
+// WithBaseURL sets the API root, for example for a gateway. Otherwise
+// TYPESAFE_BASE_URL or https://api.typesafe.ai is used.
+func WithBaseURL(u string) Option {
+	return func(c *Client) error {
+		v, err := normalizeBaseURL(u)
+		if err != nil {
+			return err
+		}
+		c.baseURL = v
+		return nil
+	}
+}
+
+// WithModel sets the default model. Otherwise TYPESAFE_DEFAULT_MODEL or
+// jev-latest is used.
+func WithModel(m string) Option {
+	return func(c *Client) error { c.model = m; return nil }
+}
+
+// WithRetryPolicy replaces the default retry policy.
+func WithRetryPolicy(p RetryPolicy) Option {
+	return func(c *Client) error { c.retry = p; return nil }
+}
+
+// WithTimeout sets the timeout for each HTTP attempt. Default 10s. Zero
+// disables the per-attempt timeout.
+func WithTimeout(d time.Duration) Option {
+	return func(c *Client) error {
+		if d < 0 {
+			return fmt.Errorf("typesafe: timeout must not be negative")
+		}
+		c.timeout = d
+		return nil
+	}
+}
+
+// WithHeaders adds headers to every request.
+func WithHeaders(h http.Header) Option {
+	return func(c *Client) error { c.headers = h.Clone(); return nil }
+}
+
+// WithHTTPClient uses a caller-supplied http.Client. The client is copied so
+// the caller's value is not modified when instrumentation wraps its transport.
+func WithHTTPClient(hc *http.Client) Option {
+	return func(c *Client) error {
+		if hc == nil {
+			return fmt.Errorf("typesafe: http client must not be nil")
+		}
+		cp := *hc
+		c.httpClient = &cp
+		c.ownsHTTP = false
+		return nil
+	}
+}
+
+// WithInstrumentation attaches an observer, such as the otel subpackage's.
+func WithInstrumentation(i Instrumentation) Option {
+	return func(c *Client) error { c.instr = i; return nil }
+}
+
+// WithLogger sets the logger. Otherwise TYPESAFE_LOG_LEVEL selects a text
+// logger on stderr, and unset means no logging.
+func WithLogger(l *slog.Logger) Option {
+	return func(c *Client) error { c.logger = l; return nil }
+}
+
+// NewClient builds a Client. It fails when no API key is configured.
+func NewClient(opts ...Option) (*Client, error) {
+	c := &Client{
+		retry:   DefaultRetryPolicy(),
+		timeout: DefaultTimeout,
+		headers: http.Header{},
+		random:  rand.Float64,
+	}
+	for _, o := range opts {
+		if err := o(c); err != nil {
+			return nil, err
+		}
+	}
+	if c.apiKey == "" {
+		c.apiKey = os.Getenv(EnvAPIKey)
+	}
+	if c.apiKey == "" {
+		return nil, ErrMissingAPIKey
+	}
+	if c.baseURL == "" {
+		raw := os.Getenv(EnvBaseURL)
+		if raw == "" {
+			raw = DefaultBaseURL
+		}
+		v, err := normalizeBaseURL(raw)
+		if err != nil {
+			return nil, err
+		}
+		c.baseURL = v
+	}
+	if c.model == "" {
+		c.model = os.Getenv(EnvDefaultModel)
+	}
+	if c.model == "" {
+		c.model = DefaultModel
+	}
+	if c.httpClient == nil {
+		c.httpClient = &http.Client{}
+		c.ownsHTTP = true
+	}
+	if c.instr != nil {
+		rt := c.httpClient.Transport
+		if rt == nil {
+			rt = http.DefaultTransport
+		}
+		c.httpClient.Transport = c.instr.Transport(rt)
+	}
+	if c.logger == nil {
+		c.logger = NewLogger(os.Stderr, os.Getenv(EnvLogLevel))
+	}
+	return c, nil
+}
+
+func normalizeBaseURL(raw string) (string, error) {
+	u, err := url.Parse(raw)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return "", fmt.Errorf("typesafe: invalid base URL %q", raw)
+	}
+	return strings.TrimRight(raw, "/"), nil
+}
+
+// NewLogger returns a text logger on w at the named level: debug, info,
+// warning (or warn), error. Any other value, including "off" and "",
+// returns a logger that discards everything.
+func NewLogger(w io.Writer, level string) *slog.Logger {
+	var lvl slog.Level
+	switch strings.ToLower(strings.TrimSpace(level)) {
+	case "debug":
+		lvl = slog.LevelDebug
+	case "info":
+		lvl = slog.LevelInfo
+	case "warning", "warn":
+		lvl = slog.LevelWarn
+	case "error":
+		lvl = slog.LevelError
+	default:
+		return slog.New(slog.DiscardHandler)
+	}
+	return slog.New(slog.NewTextHandler(w, &slog.HandlerOptions{Level: lvl}))
+}
+
+// Close releases idle connections held by a client-owned http.Client.
+func (c *Client) Close() error {
+	if c.ownsHTTP {
+		c.httpClient.CloseIdleConnections()
+	}
+	return nil
+}
+
+type requestConfig struct {
+	model     string
+	retry     RetryPolicy
+	timeout   time.Duration
+	headers   http.Header
+	extraBody map[string]any
+}
+
+// RequestOption configures a single call.
+type RequestOption func(*requestConfig)
+
+// WithRequestModel overrides the client's model for this call.
+func WithRequestModel(m string) RequestOption {
+	return func(rc *requestConfig) { rc.model = m }
+}
+
+// WithRequestRetry overrides the retry policy for this call.
+func WithRequestRetry(p RetryPolicy) RequestOption {
+	return func(rc *requestConfig) { rc.retry = p }
+}
+
+// WithRequestTimeout overrides the per-attempt timeout for this call.
+func WithRequestTimeout(d time.Duration) RequestOption {
+	return func(rc *requestConfig) { rc.timeout = d }
+}
+
+// WithExtraHeaders adds headers to this call, replacing client headers with
+// the same name.
+func WithExtraHeaders(h http.Header) RequestOption {
+	return func(rc *requestConfig) { rc.headers = h.Clone() }
+}
+
+// WithExtraBody merges fields into the top level of the request body. Use it
+// for API fields this package does not model yet.
+func WithExtraBody(fields map[string]any) RequestOption {
+	return func(rc *requestConfig) { rc.extraBody = fields }
+}
+
+func (c *Client) requestConfig(opts []RequestOption) requestConfig {
+	rc := requestConfig{model: c.model, retry: c.retry, timeout: c.timeout}
+	for _, o := range opts {
+		o(&rc)
+	}
+	return rc
+}
+
+func (c *Client) startInstrument(ctx context.Context, info RequestInfo) (context.Context, func(RequestResult)) {
+	if c.instr == nil {
+		return ctx, func(RequestResult) {}
+	}
+	return c.instr.RequestStart(ctx, info)
+}
+
+// SystemOne asks the named questions about state and returns the typed
+// answers. state is a string, map, slice, or struct that encodes to JSON.
+func (c *Client) SystemOne(ctx context.Context, state any, questions Questions, opts ...RequestOption) (*SystemOneResponse, error) {
+	rc := c.requestConfig(opts)
+	if err := validateContent("state", state, false); err != nil {
+		return nil, err
+	}
+	if err := validateQuestions(questions); err != nil {
+		return nil, err
+	}
+	body := map[string]any{"state": state, "model": rc.model, "questions": questions}
+	for k, v := range rc.extraBody {
+		body[k] = v
+	}
+	payload, err := json.Marshal(body)
+	if err != nil {
+		return nil, &ValidationError{Path: "body", Err: err}
+	}
+	info := RequestInfo{Operation: "system_one", Model: rc.model, State: state, Questions: questions}
+	info.QuestionCount, info.NoulCount, info.ChoiceCount, info.ScoreCount = countQuestions(questions)
+	ctx, finish := c.startInstrument(ctx, info)
+
+	resp, raw, attempts, err := c.send(ctx, http.MethodPost, "/v1/systemone", payload, rc.headers, rc.retry, rc.timeout)
+	if err != nil {
+		finish(RequestResult{Attempts: attempts, Status: statusOf(resp), RequestID: requestIDOf(resp), Err: err})
+		return nil, err
+	}
+	out, err := decodeSystemOne(raw)
+	if err != nil {
+		finish(RequestResult{Attempts: attempts, Status: resp.StatusCode, RequestID: requestIDOf(resp), Err: err})
+		return nil, err
+	}
+	out.RequestID = requestIDOf(resp)
+	out.Raw = &RawResponse{Status: resp.StatusCode, Header: resp.Header.Clone(), Body: raw}
+	finish(RequestResult{Attempts: attempts, Status: resp.StatusCode, RequestID: out.RequestID, Model: out.Model, Usage: out.Usage, Response: out})
+	return out, nil
+}
+
+// ListModels returns the models available to the account.
+func (c *Client) ListModels(ctx context.Context, opts ...RequestOption) (*ListModelsResponse, error) {
+	rc := c.requestConfig(opts)
+	ctx, finish := c.startInstrument(ctx, RequestInfo{Operation: "list_models", Model: rc.model})
+	resp, raw, attempts, err := c.send(ctx, http.MethodGet, "/v1/models", nil, rc.headers, rc.retry, rc.timeout)
+	if err != nil {
+		finish(RequestResult{Attempts: attempts, Status: statusOf(resp), RequestID: requestIDOf(resp), Err: err})
+		return nil, err
+	}
+	out, err := decodeModels(raw)
+	if err != nil {
+		finish(RequestResult{Attempts: attempts, Status: resp.StatusCode, RequestID: requestIDOf(resp), Err: err})
+		return nil, err
+	}
+	out.RequestID = requestIDOf(resp)
+	out.Raw = &RawResponse{Status: resp.StatusCode, Header: resp.Header.Clone(), Body: raw}
+	finish(RequestResult{Attempts: attempts, Status: resp.StatusCode, RequestID: out.RequestID})
+	return out, nil
+}
+
+func statusOf(resp *http.Response) int {
+	if resp == nil {
+		return 0
+	}
+	return resp.StatusCode
+}
+
+func requestIDOf(resp *http.Response) string {
+	if resp == nil {
+		return ""
+	}
+	return resp.Header.Get(headerRequestID)
+}
+
+func countQuestions(qs Questions) (total, nouls, choices, scores int) {
+	for _, q := range qs {
+		total++
+		switch v := q.(type) {
+		case Noul, *Noul:
+			nouls++
+		case Choice, *Choice:
+			choices++
+		case Score, *Score:
+			scores++
+		case RawQuestion:
+			switch v["type"] {
+			case "noul":
+				nouls++
+			case "choice":
+				choices++
+			case "score":
+				scores++
+			}
+		}
+	}
+	return total, nouls, choices, scores
+}
