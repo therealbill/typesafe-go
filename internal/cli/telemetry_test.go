@@ -114,3 +114,55 @@ func TestSetupTelemetryDisabledReturnsNoopAndNil(t *testing.T) {
 		t.Fatalf("tracing off must be silent, got %q", errOut.String())
 	}
 }
+
+func TestTelemetryConfigRedactsSecretsInParseErrors(t *testing.T) {
+	const secret = "hcaik-0123456789abcdef-distinctive"
+	path := t.TempDir() + "/otel.yaml"
+	// "processors" requires a list, so an expanded scalar makes YAML parsing
+	// fail on text that quotes the substituted value.
+	yaml := "file_format: \"1.0\"\ntracer_provider:\n  processors: ${HONEYCOMB_API_KEY}\n"
+	if err := writeFile(path, yaml); err != nil {
+		t.Fatal(err)
+	}
+	_, err := telemetryConfig(env(map[string]string{"OTEL_CONFIG_FILE": path, "HONEYCOMB_API_KEY": secret}))
+	if err == nil {
+		t.Fatal("expected a parse error")
+	}
+	if strings.Contains(err.Error(), secret) {
+		t.Fatalf("the error must not contain the secret: %q", err)
+	}
+	// The YAML library truncates long scalars, so a prefix is what actually
+	// leaks. Prove none of it survives.
+	if strings.Contains(err.Error(), secret[:6]) {
+		t.Fatalf("the error must not contain a secret prefix: %q", err)
+	}
+	if !strings.Contains(err.Error(), "[redacted]") {
+		t.Fatalf("the error must mark the redaction: %q", err)
+	}
+	if !strings.Contains(err.Error(), "parse OTEL_CONFIG_FILE") {
+		t.Fatalf("the error must still say what failed: %q", err)
+	}
+}
+
+func TestRedactSecrets(t *testing.T) {
+	tests := []struct {
+		name   string
+		msg    string
+		values []string
+		want   string
+	}{
+		{"whole value", "bad token abcdefgh here", []string{"abcdefgh"}, "bad token [redacted] here"},
+		{"truncated prefix", "cannot unmarshal !!str `abcdefg...` into T", []string{"abcdefghijklmnop"},
+			"cannot unmarshal !!str `[redacted]...` into T"},
+		{"short values are left alone", "value abc here", []string{"abc"}, "value abc here"},
+		{"absent value changes nothing", "nothing to see", []string{"abcdefgh"}, "nothing to see"},
+		{"every occurrence", "abcdefgh and abcdefgh", []string{"abcdefgh"}, "[redacted] and [redacted]"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := redactSecrets(tt.msg, tt.values); got != tt.want {
+				t.Fatalf("got %q want %q", got, tt.want)
+			}
+		})
+	}
+}

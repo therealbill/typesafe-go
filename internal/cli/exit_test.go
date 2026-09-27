@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/therealbill/typesafe-go"
@@ -31,8 +32,12 @@ func TestClassify(t *testing.T) {
 		{"timeout", &typesafe.TimeoutError{ConnectionError: typesafe.ConnectionError{Err: context.DeadlineExceeded}}, ExitConnection, "connection"},
 		{"invalid response", &typesafe.ResponseValidationError{FieldPath: "answers.a", Err: errors.New("x")}, ExitServer, "invalid_response"},
 		{"missing key", typesafe.ErrMissingAPIKey, ExitUsage, "usage"},
+		{"missing key wrapped", fmt.Errorf("build client: %w", typesafe.ErrMissingAPIKey), ExitUsage, "usage"},
 		{"usage", &usageError{errors.New("bad flag")}, ExitUsage, "usage"},
-		{"unknown", errors.New("?"), ExitUsage, "usage"},
+		{"cancelled", context.Canceled, ExitInterrupted, "interrupted"},
+		{"cancelled through connection", &typesafe.ConnectionError{Err: context.Canceled}, ExitInterrupted, "interrupted"},
+		{"deadline stays a connection error", &typesafe.TimeoutError{ConnectionError: typesafe.ConnectionError{Err: context.DeadlineExceeded}}, ExitConnection, "connection"},
+		{"unknown", errors.New("?"), ExitUsage, "internal"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

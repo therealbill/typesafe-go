@@ -2,7 +2,9 @@ package cli
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -11,6 +13,9 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
+
+	"github.com/therealbill/typesafe-go/internal/version"
 )
 
 const okBody = `{"model":"jev-1.13.0","answers":{"billing":{"type":"noul","noul":0.99},"tone":{"type":"choice","choice":"angry","confidence":1.0,"probabilities":{"neutral":0.0,"angry":1.0,"calm":0.0}},"urgency":{"type":"score","score":1.9,"confidence":0.85,"legend":{"0":"Not urgent at all","1":"Somewhat urgent","2":"Very urgent"},"probabilities":{"0":0.0,"1":0.1,"2":0.9}}},"usage":{"input_tokens":407,"output_tokens":72}}`
@@ -345,13 +350,12 @@ func TestNumericFlagValidation(t *testing.T) {
 
 func TestExplicitZeroTimeoutReachesTheLibrary(t *testing.T) {
 	g := &globals{timeout: 0}
-	opts := g.clientOptions(IO{Err: io.Discard}, nil, func(name string) bool { return name == "timeout" })
-	if len(opts) == 0 {
-		t.Fatal("an explicit --timeout 0 must produce a WithTimeout option")
-	}
-	none := g.clientOptions(IO{Err: io.Discard}, nil, func(string) bool { return false })
-	if len(none) != 0 {
-		t.Fatalf("an unset --timeout must produce no options, got %d", len(none))
+	noEnv := func(string) bool { return false }
+	opts := g.clientOptions(IO{Err: io.Discard}, nil, func(name string) bool { return name == "timeout" }, env(nil))
+	timeoutOpts := len(opts)
+	none := g.clientOptions(IO{Err: io.Discard}, nil, noEnv, env(nil))
+	if timeoutOpts != len(none)+1 {
+		t.Fatalf("an explicit --timeout 0 must add exactly one option: %d vs %d", timeoutOpts, len(none))
 	}
 }
 
@@ -407,5 +411,99 @@ func TestAskSucceedsWhenTracingConfigIsBroken(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), `"model":"jev-1.13.0"`) {
 		t.Fatalf("the answer must still be printed, got %q", out.String())
+	}
+}
+
+func TestVersionFlag(t *testing.T) {
+	code, out, errOut := run(t, "", "--version")
+	if code != ExitOK {
+		t.Fatalf("exit %d stderr %s", code, errOut)
+	}
+	if !strings.Contains(out, version.Version) {
+		t.Fatalf("stdout %q must contain the version %q", out, version.Version)
+	}
+}
+
+func TestStderrLineStripsTerminalEscapes(t *testing.T) {
+	const escRune = 0x1b
+	esc := string(rune(escRune))
+	msg, err := json.Marshal("boom " + esc + "[31mRED" + esc + "[0m done")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := `{"detail":{"error_type":"api_usage_error","message":` + string(msg) + `}}`
+	srv, _ := serve(t, 400, body, nil)
+	code, out, errOut := run(t, requestJSON, append([]string{"ask"}, baseArgs(srv.URL)...)...)
+	if code != ExitRequest {
+		t.Fatalf("exit %d", code)
+	}
+	if strings.ContainsRune(errOut, escRune) {
+		t.Fatalf("stderr must not carry a raw escape byte: %q", errOut)
+	}
+	want := fmt.Sprintf("\\x%02x[31m", escRune)
+	if !strings.Contains(errOut, want) {
+		t.Fatalf("stderr must show the escape in escaped form %q, got %q", want, errOut)
+	}
+	if strings.Count(strings.TrimRight(errOut, "\n"), "\n") != 0 {
+		t.Fatalf("stderr must stay one line: %q", errOut)
+	}
+	var payload struct {
+		Error struct {
+			Kind string `json:"kind"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal([]byte(out), &payload); err != nil || payload.Error.Kind != "request" {
+		t.Fatalf("stdout %s err %v", out, err)
+	}
+}
+
+func TestInterruptDuringRequestExits130(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// The handler cancels the caller's context while the request is in
+	// flight, then leaves promptly. Waiting only on r.Context() would block
+	// Close if the server never notices the client's disconnect.
+	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		cancel()
+		select {
+		case <-r.Context().Done():
+		case <-time.After(500 * time.Millisecond):
+		}
+	}))
+	t.Cleanup(srv.Close)
+
+	t.Setenv("TYPESAFE_API_KEY", "")
+	t.Setenv("HONEYCOMB_API_KEY", "")
+	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
+	t.Setenv("OTEL_CONFIG_FILE", "")
+
+	var out, errOut bytes.Buffer
+	args := append([]string{"ask"}, baseArgs(srv.URL)...)
+	code := runMain(ctx, args, strings.NewReader(requestJSON), &out, &errOut)
+	if code != ExitInterrupted {
+		t.Fatalf("exit %d want %d; stdout %s stderr %s", code, ExitInterrupted, out.String(), errOut.String())
+	}
+	if !strings.Contains(out.String(), `"kind":"interrupted"`) {
+		t.Fatalf("stdout %s", out.String())
+	}
+}
+
+func TestEnvLogLevelGoesToInjectedStderr(t *testing.T) {
+	srv, _ := serve(t, 200, okBody, nil)
+	var out, errOut bytes.Buffer
+	getenv := func(k string) string {
+		if k == "TYPESAFE_LOG_LEVEL" {
+			return "debug"
+		}
+		return ""
+	}
+	root := NewRootCmd(IO{In: strings.NewReader(requestJSON), Out: &out, Err: &errOut}, getenv)
+	root.SetArgs(append([]string{"ask"}, baseArgs(srv.URL)...))
+	if err := root.ExecuteContext(context.Background()); err != nil {
+		t.Fatalf("execute: %v stderr %s", err, errOut.String())
+	}
+	if !strings.Contains(errOut.String(), "typesafe request ok") {
+		t.Fatalf("env-driven logging must reach the injected stderr, got %q", errOut.String())
 	}
 }

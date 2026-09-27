@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/therealbill/typesafe-go"
+	"github.com/therealbill/typesafe-go/internal/version"
 )
 
 // globals are the persistent flags shared by every subcommand.
@@ -37,6 +38,7 @@ func NewRootCmd(streams IO, getenv func(string) string) *cobra.Command {
 		Use:           "jev",
 		Short:         "Ask TypeSafe's Jev model typed questions from the command line",
 		Long:          "jev sends a state and a set of typed questions (noul, choice, score) to the TypeSafe System One API and prints the answers as JSON.",
+		Version:       version.Version,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
@@ -45,7 +47,7 @@ func NewRootCmd(streams IO, getenv func(string) string) *cobra.Command {
 	pf.StringVar(&g.baseURL, "base-url", "", "API base URL (env TYPESAFE_BASE_URL)")
 	pf.StringVar(&g.model, "model", "", "model name (env TYPESAFE_DEFAULT_MODEL; default jev-latest)")
 	pf.DurationVar(&g.timeout, "timeout", 0, "per-attempt HTTP timeout (default 10s)")
-	pf.IntVar(&g.maxRetries, "max-retries", -1, "retries after the first attempt (default 2)")
+	pf.IntVar(&g.maxRetries, "max-retries", 2, "retries after the first attempt")
 	pf.StringVar(&g.logLevel, "log-level", "", "debug|info|warning|error|off (env TYPESAFE_LOG_LEVEL)")
 	pf.BoolVar(&g.trace, "trace", false, "force OpenTelemetry tracing on")
 	pf.BoolVar(&g.noTrace, "no-trace", false, "disable tracing even when HONEYCOMB_API_KEY or OTEL_* is set")
@@ -72,8 +74,9 @@ func (g *globals) validateFlags(changed func(string) bool) error {
 
 // clientOptions turns the globals into client options. changed reports
 // whether the named flag was given explicitly, so an explicit zero reaches
-// the library instead of being mistaken for "unset".
-func (g *globals) clientOptions(streams IO, inst typesafe.Instrumentation, changed func(string) bool) []typesafe.Option {
+// the library instead of being mistaken for "unset". getenv supplies the
+// log level when --log-level was not given.
+func (g *globals) clientOptions(streams IO, inst typesafe.Instrumentation, changed func(string) bool, getenv func(string) string) []typesafe.Option {
 	var opts []typesafe.Option
 	if g.apiKey != "" {
 		opts = append(opts, typesafe.WithAPIKey(g.apiKey))
@@ -92,19 +95,31 @@ func (g *globals) clientOptions(streams IO, inst typesafe.Instrumentation, chang
 		p.MaxRetries = g.maxRetries
 		opts = append(opts, typesafe.WithRetryPolicy(p))
 	}
-	if g.logLevel != "" {
-		opts = append(opts, typesafe.WithLogger(typesafe.NewLogger(streams.Err, g.logLevel)))
+	// A logger is always injected so that env-driven logging lands on the
+	// stream the caller supplied rather than on the process's own stderr.
+	// NewLogger discards everything for an empty or unrecognized level.
+	level := g.logLevel
+	if level == "" {
+		level = getenv(typesafe.EnvLogLevel)
 	}
+	opts = append(opts, typesafe.WithLogger(typesafe.NewLogger(streams.Err, level)))
 	if inst != nil {
 		opts = append(opts, typesafe.WithInstrumentation(inst))
 	}
 	return opts
 }
 
-// Main runs the command and returns the process exit code.
+// Main runs the command and returns the process exit code. It installs the
+// signal handler and then defers to runMain.
 func Main(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	return runMain(ctx, args, stdin, stdout, stderr)
+}
+
+// runMain runs the command under ctx and returns the process exit code. It
+// exists so tests can cancel the context that Main derives from signals.
+func runMain(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	root := NewRootCmd(IO{In: stdin, Out: stdout, Err: stderr}, os.Getenv)
 	root.SetArgs(args)
 	err := root.ExecuteContext(ctx)
@@ -120,6 +135,6 @@ func Main(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	// stdout never has to special-case invocation mistakes.
 	pretty, _ := root.PersistentFlags().GetBool("pretty")
 	_ = writeJSON(stdout, map[string]any{"error": errorPayload{Kind: "usage", Message: err.Error()}}, pretty)
-	_, _ = fmt.Fprintf(stderr, "jev: %v\nRun 'jev --help' for usage.\n", err)
+	_, _ = fmt.Fprintf(stderr, "jev: %s\nRun 'jev --help' for usage.\n", sanitize(err.Error()))
 	return ExitUsage
 }

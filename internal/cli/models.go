@@ -19,7 +19,7 @@ func newModelsCmd(g *globals, streams IO, getenv func(string) string) *cobra.Com
 			ctx := cmd.Context()
 			shutdown, inst := setupTelemetry(ctx, g, streams, getenv)
 			defer shutdown()
-			client, err := typesafe.NewClient(g.clientOptions(streams, inst, changed)...)
+			client, err := typesafe.NewClient(g.clientOptions(streams, inst, changed, getenv)...)
 			if err != nil {
 				return fail(streams, g.pretty, err)
 			}

@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -57,6 +58,29 @@ func setupTelemetry(ctx context.Context, g *globals, streams IO, getenv func(str
 	return shutdown, tsotel.New()
 }
 
+// minRedactLen is the shortest expanded value worth redacting. Below it a
+// match is far more likely to be ordinary text than a secret.
+const minRedactLen = 4
+
+// redactSecrets removes expanded values from msg. The YAML library truncates
+// long scalars when it quotes them, so each value is matched by the longest
+// prefix of it that actually appears, not only in full. Values shorter than
+// minRedactLen are left alone.
+func redactSecrets(msg string, values []string) string {
+	for _, v := range values {
+		if len(v) < minRedactLen {
+			continue
+		}
+		for n := len(v); n >= minRedactLen; n-- {
+			if prefix := v[:n]; strings.Contains(msg, prefix) {
+				msg = strings.ReplaceAll(msg, prefix, "[redacted]")
+				break
+			}
+		}
+	}
+	return msg
+}
+
 // telemetryConfig loads OTEL_CONFIG_FILE (with ${VAR} expansion from the
 // environment) or builds a configuration from HONEYCOMB_API_KEY,
 // OTEL_EXPORTER_OTLP_ENDPOINT, and OTEL_SERVICE_NAME.
@@ -66,10 +90,21 @@ func telemetryConfig(getenv func(string) string) (otelconf.OpenTelemetryConfigur
 		if err != nil {
 			return otelconf.OpenTelemetryConfiguration{}, fmt.Errorf("read OTEL_CONFIG_FILE: %w", err)
 		}
-		expanded := os.Expand(string(b), getenv)
+		// Every substituted value is recorded so that a parse failure, which
+		// quotes the offending text, cannot echo an expanded secret.
+		var substituted []string
+		expanded := os.Expand(string(b), func(name string) string {
+			v := getenv(name)
+			if v != "" {
+				substituted = append(substituted, v)
+			}
+			return v
+		})
 		cfg, err := otelconf.ParseYAML([]byte(expanded))
 		if err != nil {
-			return otelconf.OpenTelemetryConfiguration{}, fmt.Errorf("parse OTEL_CONFIG_FILE: %w", err)
+			// Rebuilt rather than wrapped: wrapping with %w would keep the
+			// unredacted text reachable through Unwrap.
+			return otelconf.OpenTelemetryConfiguration{}, errors.New("parse OTEL_CONFIG_FILE: " + redactSecrets(err.Error(), substituted))
 		}
 		return *cfg, nil
 	}
