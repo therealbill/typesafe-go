@@ -116,7 +116,7 @@ Use these byte-for-byte in tests. They live in `testdata/` after Task 4.
 **Files:**
 - Create: `go.mod`, `doc.go`, `internal/version/version.go`, `instrument.go`
 
-- [ ] **Step 1: Create the module**
+- [x] **Step 1: Create the module**
 
 ```bash
 cd /Users/bill/Projects/gojev
@@ -126,7 +126,7 @@ cat go.mod
 ```
 Expected: `module github.com/therealbill/typesafe-go` and `go 1.25`.
 
-- [ ] **Step 2: Write `doc.go`**
+- [x] **Step 2: Write `doc.go`**
 
 ```go
 // Package typesafe is a client for the TypeSafe System One API.
@@ -148,7 +148,7 @@ Expected: `module github.com/therealbill/typesafe-go` and `go 1.25`.
 package typesafe
 ```
 
-- [ ] **Step 3: Write `internal/version/version.go`**
+- [x] **Step 3: Write `internal/version/version.go`**
 
 ```go
 // Package version holds build information set at link time.
@@ -161,7 +161,7 @@ var Version = "dev"
 var Commit = "none"
 ```
 
-- [ ] **Step 4: Write `instrument.go`**
+- [x] **Step 4: Write `instrument.go`**
 
 ```go
 package typesafe
@@ -234,7 +234,7 @@ type Usage struct{ InputTokens, OutputTokens *int }
 type SystemOneResponse struct{}
 ```
 
-- [ ] **Step 5: Verify build and commit**
+- [x] **Step 5: Verify build and commit**
 
 ```bash
 gofmt -l . ; go vet ./... && go build ./...
