@@ -321,8 +321,11 @@ Commands:
   - Input: `-f FILE` or stdin JSON in the exact HTTP body shape
     (`state`, `questions`, optional `model`); or flags `--state STR|@file|-`,
     repeated `--noul key=instructions`, `--choice key=instructions:l1,l2,...`,
-    `--score key=instructions:lvl0|lvl1|...`. JSON and flags are mutually
-    exclusive.
+    `--score key=instructions:lvl0|lvl1|...`. `-f` and the question flags are
+    mutually exclusive; in flag mode stdin is read only when `--state -` is
+    given. Instructions may contain `:`; labels and levels may not contain
+    `:`, and labels may not contain `,` nor levels `|`. With no `-f`, no
+    question flags, and a terminal on stdin, `ask` exits 1 immediately.
   - Output: response JSON on stdout: `model`, `answers`, `usage`,
     `request_id`. `--raw` prints the server body unchanged.
 - `jev models` — prints `{"models":[...]}`.
@@ -379,7 +382,8 @@ tests against this spec. Jev returns typed judgments, not explanations, so the
 tool asks many narrow questions and escalates the doubtful ones.
 
 Layout: `tools/selfreview/` holds a Go driver (`main.go`, run via
-`make selfreview`) and `questions/*.json` templates. The driver requires
+`make selfreview`) with the question templates built in code, and
+`units.json` describing the units. The driver requires
 `TYPESAFE_API_KEY` and invokes `jev ask` in JSON mode over stdin, so it is
 also the end-to-end exercise of the input mode the plugin will use.
 
@@ -395,7 +399,7 @@ file(s), and test file(s). One request per unit with state
   names; 3: also concurrency, cancellation, and boundary values the spec
   names).
 - Choice of the weakest area from a fixed set: `validation`, `error_mapping`,
-  `retry`, `decoding`, `logging`, `none`.
+  `retry`, `decoding`, `encoding`, `logging`, `none`.
 
 Output: `selfreview-report.json` and a Markdown summary on stdout. Thresholds
 (defaults, overridable by flag): a behavior Noul below 0.6, a contradiction

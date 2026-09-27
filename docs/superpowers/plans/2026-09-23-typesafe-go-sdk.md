@@ -3202,7 +3202,7 @@ git commit -m "Add env-gated live integration test"
 - Create: `otel/otel.go`, `otel/otel_test.go`
 - Modify: `go.mod`, `go.sum` (via `go get`)
 
-- [ ] **Step 1: Add dependencies**
+- [x] **Step 1: Add dependencies**
 
 ```bash
 cd /Users/bill/Projects/gojev
@@ -3212,7 +3212,7 @@ grep -c "opentelemetry" go.mod
 ```
 Expected: `go.mod` lists the four modules; the count is at least 4. Confirm `go 1.25` is still the directive (it will not be lowered).
 
-- [ ] **Step 2: Write the failing tests `otel/otel_test.go`**
+- [x] **Step 2: Write the failing tests `otel/otel_test.go`**
 
 ```go
 package otel
@@ -3366,14 +3366,14 @@ func TestTransportWraps(t *testing.T) {
 }
 ```
 
-- [ ] **Step 3: Run tests to verify they fail**
+- [x] **Step 3: Run tests to verify they fail**
 
 ```bash
 go test ./otel/ 2>&1 | head -3
 ```
 Expected: `undefined: New` and attribute constants.
 
-- [ ] **Step 4: Write `otel/otel.go`**
+- [x] **Step 4: Write `otel/otel.go`**
 
 ```go
 // Package otel instruments a typesafe.Client with OpenTelemetry traces.
@@ -3584,14 +3584,14 @@ func errorType(err error) string {
 }
 ```
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 ```bash
 go test -v ./otel/ 2>&1 | tail -8
 ```
 Expected: five PASS lines and `ok`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 gofmt -l . ; go vet ./... && go build ./... && go test ./otel/
@@ -3608,7 +3608,7 @@ git commit -m "Add OpenTelemetry instrumentation package"
 **Files:**
 - Modify: `otel/otel_test.go` (append)
 
-- [ ] **Step 1: Append the test**
+- [x] **Step 1: Append the test**
 
 ```go
 func TestEndToEndParentage(t *testing.T) {
@@ -3674,7 +3674,7 @@ func names(spans tracetest.SpanStubs) []string {
 
 Add to the imports of `otel/otel_test.go`: `"net/http"`, `"net/http/httptest"`, `otelapi "go.opentelemetry.io/otel"`, `"go.opentelemetry.io/otel/propagation"`.
 
-- [ ] **Step 2: Run and commit**
+- [x] **Step 2: Run and commit**
 
 ```bash
 go test -race -v ./otel/ 2>&1 | tail -8
