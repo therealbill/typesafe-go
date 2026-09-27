@@ -132,3 +132,36 @@ func TestValidateContentState(t *testing.T) {
 		}
 	}
 }
+
+func TestNoulCriteriaOmittedWhenNil(t *testing.T) {
+	out, err := json.Marshal(Noul{Instructions: "x"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got map[string]any
+	if err := json.Unmarshal(out, &got); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := got["criteria"]; ok {
+		t.Fatalf("a nil Criteria must be omitted from the wire JSON, got %s", out)
+	}
+
+	out, err = json.Marshal(Noul{Instructions: "x", Criteria: &NoulCriteria{True: "yes"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got = nil
+	if err := json.Unmarshal(out, &got); err != nil {
+		t.Fatal(err)
+	}
+	crit, ok := got["criteria"].(map[string]any)
+	if !ok {
+		t.Fatalf("a non-nil Criteria must appear in the wire JSON, got %s", out)
+	}
+	if crit["true"] != "yes" {
+		t.Fatalf("criteria.true should carry the description, got %s", out)
+	}
+	if _, ok := crit["false"]; ok {
+		t.Fatalf("an unset Criteria.False must be omitted, got %s", out)
+	}
+}
