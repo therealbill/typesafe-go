@@ -2,11 +2,15 @@ package otel
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
+	otelapi "go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/propagation"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	"go.opentelemetry.io/otel/trace"
@@ -146,4 +150,64 @@ func TestTransportWraps(t *testing.T) {
 	if rt == nil {
 		t.Fatal("transport must not be nil")
 	}
+}
+
+func TestEndToEndParentage(t *testing.T) {
+	exp, tp := newRecorder(t)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Traceparent") == "" {
+			t.Error("traceparent header should be propagated by otelhttp")
+		}
+		w.Header().Set("x-typesafe-request-id", "req_e2e")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"model":"jev-1.13.0","answers":{"b":{"type":"noul","noul":0.5}},"usage":{"input_tokens":1,"output_tokens":1}}`))
+	}))
+	t.Cleanup(srv.Close)
+
+	prev := otelapi.GetTextMapPropagator()
+	otelapi.SetTextMapPropagator(propagation.TraceContext{})
+	t.Cleanup(func() { otelapi.SetTextMapPropagator(prev) })
+
+	client, err := typesafe.NewClient(typesafe.WithAPIKey("k"), typesafe.WithBaseURL(srv.URL), typesafe.WithInstrumentation(New(WithTracerProvider(tp))))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, parent := tp.Tracer("test").Start(context.Background(), "caller")
+	if _, err := client.SystemOne(ctx, "s", typesafe.Questions{"b": typesafe.Noul{Instructions: "?"}}); err != nil {
+		t.Fatal(err)
+	}
+	parent.End()
+
+	spans := exp.GetSpans()
+	byName := map[string]tracetest.SpanStub{}
+	for _, s := range spans {
+		byName[s.Name] = s
+	}
+	op, ok := byName["typesafe.system_one"]
+	if !ok {
+		t.Fatalf("operation span missing, have %v", names(spans))
+	}
+	if op.Parent.SpanID() != parent.SpanContext().SpanID() {
+		t.Fatal("operation span should be a child of the caller span")
+	}
+	var httpSpan *tracetest.SpanStub
+	for i := range spans {
+		if spans[i].SpanKind == trace.SpanKindClient && spans[i].Name != "typesafe.system_one" {
+			httpSpan = &spans[i]
+		}
+	}
+	if httpSpan == nil || httpSpan.Parent.SpanID() != op.SpanContext.SpanID() {
+		t.Fatalf("HTTP span should be a child of the operation span; spans %v", names(spans))
+	}
+	if attrMap(op.Attributes)[AttrRequestID] != "req_e2e" {
+		t.Fatal("request id not recorded")
+	}
+}
+
+func names(spans tracetest.SpanStubs) []string {
+	out := make([]string, 0, len(spans))
+	for _, s := range spans {
+		out = append(out, s.Name)
+	}
+	return out
 }
