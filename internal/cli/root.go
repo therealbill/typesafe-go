@@ -58,8 +58,22 @@ func NewRootCmd(streams IO, getenv func(string) string) *cobra.Command {
 	return root
 }
 
-// clientOptions turns the globals into client options.
-func (g *globals) clientOptions(streams IO, inst typesafe.Instrumentation) []typesafe.Option {
+// validateFlags rejects numeric flags the library cannot honor. changed
+// reports whether the named flag was given explicitly.
+func (g *globals) validateFlags(changed func(string) bool) error {
+	if changed("timeout") && g.timeout < 0 {
+		return &usageError{fmt.Errorf("--timeout must not be negative, got %s", g.timeout)}
+	}
+	if changed("max-retries") && g.maxRetries < 0 {
+		return &usageError{fmt.Errorf("--max-retries must not be negative, got %d", g.maxRetries)}
+	}
+	return nil
+}
+
+// clientOptions turns the globals into client options. changed reports
+// whether the named flag was given explicitly, so an explicit zero reaches
+// the library instead of being mistaken for "unset".
+func (g *globals) clientOptions(streams IO, inst typesafe.Instrumentation, changed func(string) bool) []typesafe.Option {
 	var opts []typesafe.Option
 	if g.apiKey != "" {
 		opts = append(opts, typesafe.WithAPIKey(g.apiKey))
@@ -70,10 +84,10 @@ func (g *globals) clientOptions(streams IO, inst typesafe.Instrumentation) []typ
 	if g.model != "" {
 		opts = append(opts, typesafe.WithModel(g.model))
 	}
-	if g.timeout > 0 {
+	if changed("timeout") {
 		opts = append(opts, typesafe.WithTimeout(g.timeout))
 	}
-	if g.maxRetries >= 0 {
+	if changed("max-retries") {
 		p := typesafe.DefaultRetryPolicy()
 		p.MaxRetries = g.maxRetries
 		opts = append(opts, typesafe.WithRetryPolicy(p))
@@ -101,6 +115,11 @@ func Main(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if errors.As(err, &ee) {
 		return ee.Code
 	}
+	// Cobra reported a bad flag, an unknown command, or bad arguments. Emit
+	// the same error envelope a request failure would, so a caller parsing
+	// stdout never has to special-case invocation mistakes.
+	pretty, _ := root.PersistentFlags().GetBool("pretty")
+	_ = writeJSON(stdout, map[string]any{"error": errorPayload{Kind: "usage", Message: err.Error()}}, pretty)
 	_, _ = fmt.Fprintf(stderr, "jev: %v\nRun 'jev --help' for usage.\n", err)
 	return ExitUsage
 }

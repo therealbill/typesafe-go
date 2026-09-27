@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -31,6 +32,35 @@ type askRequest struct {
 
 func (o *askOptions) hasQuestionFlags() bool {
 	return o.state != "" || len(o.nouls)+len(o.choices)+len(o.scores) > 0
+}
+
+// maxRequestBytes caps how much request JSON or state text jev will read
+// from stdin or a file, so a runaway pipe cannot exhaust memory.
+const maxRequestBytes = 16 << 20
+
+// errTooLarge reports input past maxRequestBytes.
+var errTooLarge = errors.New("request exceeds 16 MiB")
+
+// readCapped reads all of r, refusing input larger than maxRequestBytes.
+func readCapped(r io.Reader) ([]byte, error) {
+	b, err := io.ReadAll(io.LimitReader(r, maxRequestBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(b) > maxRequestBytes {
+		return nil, errTooLarge
+	}
+	return b, nil
+}
+
+// readCappedFile reads path, refusing input larger than maxRequestBytes.
+func readCappedFile(path string) ([]byte, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = f.Close() }()
+	return readCapped(f)
 }
 
 // errNoRequest reports that ask was invoked with nothing to send.
@@ -64,11 +94,14 @@ func buildRequest(o *askOptions, stdin io.Reader) (*askRequest, error) {
 		if o.file == "" && stdinIsTerminal(stdin) {
 			return nil, errNoRequest
 		}
-		data, err = io.ReadAll(stdin)
+		data, err = readCapped(stdin)
 	} else {
-		data, err = os.ReadFile(o.file)
+		data, err = readCappedFile(o.file)
 	}
 	if err != nil {
+		if errors.Is(err, errTooLarge) {
+			return nil, errTooLarge
+		}
 		return nil, fmt.Errorf("read request: %w", err)
 	}
 	if len(strings.TrimSpace(string(data))) == 0 {
@@ -126,6 +159,14 @@ func parseRequestJSON(data []byte) (*askRequest, error) {
 	return req, nil
 }
 
+// decodeStrict decodes raw into v, rejecting fields v does not declare so a
+// misspelled key is reported instead of silently dropped.
+func decodeStrict(raw json.RawMessage, v any) error {
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.DisallowUnknownFields()
+	return dec.Decode(v)
+}
+
 func parseQuestion(key string, raw json.RawMessage) (typesafe.Question, error) {
 	var head struct {
 		Type string `json:"type"`
@@ -139,13 +180,14 @@ func parseQuestion(key string, raw json.RawMessage) (typesafe.Question, error) {
 	switch head.Type {
 	case "noul":
 		var w struct {
-			Instructions any `json:"instructions"`
+			Type         string `json:"type"`
+			Instructions any    `json:"instructions"`
 			Criteria     *struct {
 				True  any `json:"true"`
 				False any `json:"false"`
 			} `json:"criteria"`
 		}
-		if err := json.Unmarshal(raw, &w); err != nil {
+		if err := decodeStrict(raw, &w); err != nil {
 			return nil, fmt.Errorf("invalid request: questions.%s: %w", key, err)
 		}
 		q := typesafe.Noul{Instructions: w.Instructions}
@@ -155,19 +197,21 @@ func parseQuestion(key string, raw json.RawMessage) (typesafe.Question, error) {
 		return q, nil
 	case "choice":
 		var w struct {
+			Type         string                          `json:"type"`
 			Instructions any                             `json:"instructions"`
 			Criteria     map[string]typesafe.JSONContent `json:"criteria"`
 		}
-		if err := json.Unmarshal(raw, &w); err != nil {
+		if err := decodeStrict(raw, &w); err != nil {
 			return nil, fmt.Errorf("invalid request: questions.%s: %w", key, err)
 		}
 		return typesafe.Choice{Instructions: w.Instructions, Criteria: w.Criteria}, nil
 	case "score":
 		var w struct {
+			Type         string                 `json:"type"`
 			Instructions any                    `json:"instructions"`
 			Criteria     []typesafe.JSONContent `json:"criteria"`
 		}
-		if err := json.Unmarshal(raw, &w); err != nil {
+		if err := decodeStrict(raw, &w); err != nil {
 			return nil, fmt.Errorf("invalid request: questions.%s: %w", key, err)
 		}
 		return typesafe.Score{Instructions: w.Instructions, Criteria: w.Criteria}, nil
@@ -185,6 +229,9 @@ func parseQuestion(key string, raw json.RawMessage) (typesafe.Question, error) {
 func requestFromFlags(o *askOptions, stdin io.Reader) (*askRequest, error) {
 	if o.state == "" {
 		return nil, errors.New("--state is required when using --noul, --choice, or --score")
+	}
+	if len(o.nouls)+len(o.choices)+len(o.scores) == 0 {
+		return nil, errors.New("--state needs at least one --noul, --choice, or --score question")
 	}
 	state, err := readStateFlag(o.state, stdin)
 	if err != nil {
@@ -250,14 +297,20 @@ func requestFromFlags(o *askOptions, stdin io.Reader) (*askRequest, error) {
 func readStateFlag(v string, stdin io.Reader) (string, error) {
 	switch {
 	case v == "-":
-		b, err := io.ReadAll(stdin)
+		b, err := readCapped(stdin)
 		if err != nil {
+			if errors.Is(err, errTooLarge) {
+				return "", errTooLarge
+			}
 			return "", fmt.Errorf("read state from stdin: %w", err)
 		}
 		return string(b), nil
 	case strings.HasPrefix(v, "@"):
-		b, err := os.ReadFile(v[1:])
+		b, err := readCappedFile(v[1:])
 		if err != nil {
+			if errors.Is(err, errTooLarge) {
+				return "", errTooLarge
+			}
 			return "", fmt.Errorf("read state file: %w", err)
 		}
 		return string(b), nil
@@ -266,13 +319,18 @@ func readStateFlag(v string, stdin io.Reader) (string, error) {
 	}
 }
 
-// splitKV splits "key=rest" on the first '='.
+// splitKV splits "key=rest" on the first '='. The key must be non-blank once
+// trimmed.
 func splitKV(s, flag string) (string, string, error) {
 	i := strings.Index(s, "=")
 	if i <= 0 {
 		return "", "", fmt.Errorf("%s %q: expected key=instructions", flag, s)
 	}
-	return strings.TrimSpace(s[:i]), s[i+1:], nil
+	key := strings.TrimSpace(s[:i])
+	if key == "" {
+		return "", "", fmt.Errorf("%s %q: question key must not be blank", flag, s)
+	}
+	return key, s[i+1:], nil
 }
 
 // splitInstrLabels splits "instructions:l1<sep>l2" on the LAST ':' and then

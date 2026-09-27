@@ -245,3 +245,114 @@ func TestRequestFromFlagsColonInInstructions(t *testing.T) {
 		t.Fatalf("score %+v", s)
 	}
 }
+
+func TestReadCapRejectsOversizedInput(t *testing.T) {
+	saved := stdinIsTerminal
+	t.Cleanup(func() { stdinIsTerminal = saved })
+	stdinIsTerminal = func(io.Reader) bool { return false }
+
+	big := strings.NewReader(strings.Repeat("x", maxRequestBytes+1))
+	if _, err := buildRequest(&askOptions{}, big); err == nil ||
+		!strings.Contains(err.Error(), "request exceeds 16 MiB") {
+		t.Fatalf("oversized stdin: got %v", err)
+	}
+
+	path := filepath.Join(t.TempDir(), "big.json")
+	if err := os.WriteFile(path, []byte(strings.Repeat("x", maxRequestBytes+1)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := buildRequest(&askOptions{file: path}, strings.NewReader("")); err == nil ||
+		!strings.Contains(err.Error(), "request exceeds 16 MiB") {
+		t.Fatalf("oversized file: got %v", err)
+	}
+
+	if _, err := requestFromFlags(&askOptions{state: "@" + path, nouls: []string{"a=b"}}, strings.NewReader("")); err == nil ||
+		!strings.Contains(err.Error(), "request exceeds 16 MiB") {
+		t.Fatalf("oversized @file state: got %v", err)
+	}
+
+	stateBig := strings.NewReader(strings.Repeat("y", maxRequestBytes+1))
+	if _, err := requestFromFlags(&askOptions{state: "-", nouls: []string{"a=b"}}, stateBig); err == nil ||
+		!strings.Contains(err.Error(), "request exceeds 16 MiB") {
+		t.Fatalf("oversized stdin state: got %v", err)
+	}
+}
+
+func TestReadCapAcceptsInputAtTheLimit(t *testing.T) {
+	saved := stdinIsTerminal
+	t.Cleanup(func() { stdinIsTerminal = saved })
+	stdinIsTerminal = func(io.Reader) bool { return false }
+
+	doc := `{"state":"` + strings.Repeat("z", 1024) + `","questions":{"a":{"type":"noul","instructions":"?"}}}`
+	if _, err := buildRequest(&askOptions{}, strings.NewReader(doc)); err != nil {
+		t.Fatalf("input well under the limit must pass: %v", err)
+	}
+}
+
+// typoCriteria is a deliberate misspelling of "criteria". It lives in a
+// constant so the misspell linter is suppressed in exactly one place.
+const typoCriteria = "critera" //nolint:misspell // deliberate typo fixture
+
+func TestParseQuestionRejectsUnknownFields(t *testing.T) {
+	tests := []struct {
+		name  string
+		doc   string
+		wants []string
+	}{
+		{"choice typo", `{"state":"x","questions":{"q":{"type":"choice","instructions":"x","` + typoCriteria + `":{"a":null}}}}`,
+			[]string{"questions.q", typoCriteria}},
+		{"noul typo", `{"state":"x","questions":{"q":{"type":"noul","instruction":"x"}}}`,
+			[]string{"questions.q", "instruction"}},
+		{"score typo", `{"state":"x","questions":{"q":{"type":"score","levels":["a","b"]}}}`,
+			[]string{"questions.q", "levels"}},
+		{"noul nested criteria typo", `{"state":"x","questions":{"q":{"type":"noul","criteria":{"yes":"a"}}}}`,
+			[]string{"questions.q", "yes"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := parseRequestJSON([]byte(tt.doc))
+			if err == nil {
+				t.Fatal("expected an error")
+			}
+			for _, w := range tt.wants {
+				if !strings.Contains(err.Error(), w) {
+					t.Fatalf("error %q must contain %q", err, w)
+				}
+			}
+		})
+	}
+}
+
+func TestParseRequestJSONStillAllowsUnknownTopLevelAndQuestionTypes(t *testing.T) {
+	doc := `{"state":"x","weight":3,"questions":{"f":{"type":"future","anything":1}}}`
+	req, err := parseRequestJSON([]byte(doc))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if req.Extra["weight"] != float64(3) {
+		t.Fatalf("extra %v", req.Extra)
+	}
+	r := req.Questions["f"].(typesafe.RawQuestion)
+	if r["type"] != "future" || r["anything"] != float64(1) {
+		t.Fatalf("raw question %+v", r)
+	}
+}
+
+func TestRequestFromFlagsStateWithoutQuestions(t *testing.T) {
+	_, err := requestFromFlags(&askOptions{state: "s"}, strings.NewReader(""))
+	if err == nil || !strings.Contains(err.Error(), "--noul") {
+		t.Fatalf("got %v, want an error naming the question flags", err)
+	}
+}
+
+func TestSplitKVRejectsBlankKeys(t *testing.T) {
+	for _, s := range []string{" =b", "\t=b", "   =instructions"} {
+		if _, _, err := splitKV(s, "--noul"); err == nil {
+			t.Fatalf("splitKV(%q) must reject a blank key", s)
+		}
+	}
+	key, rest, err := splitKV("  a  =b", "--noul")
+	if err != nil || key != "a" || rest != "b" {
+		t.Fatalf("got %q %q %v", key, rest, err)
+	}
+}

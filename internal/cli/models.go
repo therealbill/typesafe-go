@@ -12,10 +12,14 @@ func newModelsCmd(g *globals, streams IO, getenv func(string) string) *cobra.Com
 		Short: "List the models available to the account as JSON",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			changed := cmd.Flags().Changed
+			if err := g.validateFlags(changed); err != nil {
+				return fail(streams, g.pretty, err)
+			}
 			ctx := cmd.Context()
 			shutdown, inst := setupTelemetry(ctx, g, streams, getenv)
 			defer shutdown()
-			client, err := typesafe.NewClient(g.clientOptions(streams, inst)...)
+			client, err := typesafe.NewClient(g.clientOptions(streams, inst, changed)...)
 			if err != nil {
 				return fail(streams, g.pretty, err)
 			}

@@ -1,7 +1,10 @@
 package cli
 
 import (
+	"bytes"
+	"context"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -79,4 +82,35 @@ func TestTelemetryConfigFromFileExpandsEnv(t *testing.T) {
 
 func writeFile(path, content string) error {
 	return os.WriteFile(path, []byte(content), 0o600)
+}
+
+func TestSetupTelemetryDisablesOnBadConfigFile(t *testing.T) {
+	var errOut bytes.Buffer
+	getenv := env(map[string]string{"OTEL_CONFIG_FILE": "/nonexistent/otel.yaml"})
+	shutdown, inst := setupTelemetry(context.Background(), &globals{}, IO{Err: &errOut}, getenv)
+	if shutdown == nil {
+		t.Fatal("shutdown must never be nil")
+	}
+	shutdown()
+	if inst != nil {
+		t.Fatalf("instrumentation must be nil when tracing fails, got %T", inst)
+	}
+	if !strings.HasPrefix(errOut.String(), "jev: tracing disabled:") {
+		t.Fatalf("stderr %q", errOut.String())
+	}
+}
+
+func TestSetupTelemetryDisabledReturnsNoopAndNil(t *testing.T) {
+	var errOut bytes.Buffer
+	shutdown, inst := setupTelemetry(context.Background(), &globals{}, IO{Err: &errOut}, env(nil))
+	if shutdown == nil {
+		t.Fatal("shutdown must never be nil")
+	}
+	shutdown()
+	if inst != nil {
+		t.Fatalf("instrumentation must be nil when tracing is off, got %T", inst)
+	}
+	if errOut.Len() != 0 {
+		t.Fatalf("tracing off must be silent, got %q", errOut.String())
+	}
 }

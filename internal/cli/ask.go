@@ -46,11 +46,15 @@ func runAsk(cmd *cobra.Command, g *globals, o *askOptions, streams IO, getenv fu
 	if err != nil {
 		return fail(streams, g.pretty, &usageError{err})
 	}
+	changed := cmd.Flags().Changed
+	if err := g.validateFlags(changed); err != nil {
+		return fail(streams, g.pretty, err)
+	}
 	ctx := cmd.Context()
 	shutdown, inst := setupTelemetry(ctx, g, streams, getenv)
 	defer shutdown()
 
-	client, err := typesafe.NewClient(g.clientOptions(streams, inst)...)
+	client, err := typesafe.NewClient(g.clientOptions(streams, inst, changed)...)
 	if err != nil {
 		return fail(streams, g.pretty, err)
 	}

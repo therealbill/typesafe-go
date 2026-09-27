@@ -271,3 +271,141 @@ func TestAskTerminalStdinIsUsageError(t *testing.T) {
 		t.Fatalf("a terminal stdin must not reach the API, got %d calls", calls)
 	}
 }
+
+func TestCobraFlagErrorsEmitErrorJSON(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+	}{
+		{"unknown command", []string{"bogus"}},
+		{"unknown flag", []string{"ask", "--nope"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			code, out, errOut := run(t, "", tt.args...)
+			if code != ExitUsage {
+				t.Fatalf("exit %d want %d", code, ExitUsage)
+			}
+			var payload struct {
+				Error struct {
+					Kind    string `json:"kind"`
+					Message string `json:"message"`
+				} `json:"error"`
+			}
+			if err := json.Unmarshal([]byte(out), &payload); err != nil {
+				t.Fatalf("stdout not error JSON: %q", out)
+			}
+			if payload.Error.Kind != "usage" || payload.Error.Message == "" {
+				t.Fatalf("payload %+v", payload.Error)
+			}
+			if !strings.Contains(errOut, "jev: ") {
+				t.Fatalf("stderr %q", errOut)
+			}
+		})
+	}
+}
+
+func TestNumericFlagValidation(t *testing.T) {
+	srv, _ := serve(t, 200, okBody, nil)
+	tests := []struct {
+		name string
+		args []string
+		code int
+		kind string
+	}{
+		{"negative timeout", []string{"--timeout", "-1s"}, ExitUsage, "usage"},
+		{"negative max-retries", []string{"--max-retries", "-1"}, ExitUsage, "usage"},
+		{"explicit zero timeout", []string{"--timeout", "0"}, ExitOK, ""},
+		{"explicit zero max-retries", []string{"--max-retries", "0"}, ExitOK, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			args := append([]string{"ask", "--api-key", "k", "--base-url", srv.URL}, tt.args...)
+			code, out, errOut := run(t, requestJSON, args...)
+			if code != tt.code {
+				t.Fatalf("exit %d want %d; stdout %s stderr %s", code, tt.code, out, errOut)
+			}
+			if tt.kind == "" {
+				return
+			}
+			var payload struct {
+				Error struct {
+					Kind string `json:"kind"`
+				} `json:"error"`
+			}
+			if err := json.Unmarshal([]byte(out), &payload); err != nil {
+				t.Fatalf("stdout not error JSON: %s", out)
+			}
+			if payload.Error.Kind != tt.kind {
+				t.Fatalf("kind %q want %q", payload.Error.Kind, tt.kind)
+			}
+		})
+	}
+}
+
+func TestExplicitZeroTimeoutReachesTheLibrary(t *testing.T) {
+	g := &globals{timeout: 0}
+	opts := g.clientOptions(IO{Err: io.Discard}, nil, func(name string) bool { return name == "timeout" })
+	if len(opts) == 0 {
+		t.Fatal("an explicit --timeout 0 must produce a WithTimeout option")
+	}
+	none := g.clientOptions(IO{Err: io.Discard}, nil, func(string) bool { return false })
+	if len(none) != 0 {
+		t.Fatalf("an unset --timeout must produce no options, got %d", len(none))
+	}
+}
+
+func TestUsageShapedInputExitsOne(t *testing.T) {
+	srv, rec := serve(t, 200, okBody, nil)
+	tests := []struct {
+		name string
+		args []string
+	}{
+		{"state without questions", []string{"--state", "just some text"}},
+		{"blank question key", []string{"--state", "s", "--noul", " =instructions"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			args := append([]string{"ask"}, baseArgs(srv.URL)...)
+			args = append(args, tt.args...)
+			code, out, errOut := run(t, "", args...)
+			if code != ExitUsage {
+				t.Fatalf("exit %d want %d; stdout %s stderr %s", code, ExitUsage, out, errOut)
+			}
+			var payload struct {
+				Error struct {
+					Kind string `json:"kind"`
+				} `json:"error"`
+			}
+			if err := json.Unmarshal([]byte(out), &payload); err != nil {
+				t.Fatalf("stdout not error JSON: %s", out)
+			}
+			if payload.Error.Kind != "usage" {
+				t.Fatalf("kind %q want usage", payload.Error.Kind)
+			}
+		})
+	}
+	rec.mu.Lock()
+	calls := rec.calls
+	rec.mu.Unlock()
+	if calls != 0 {
+		t.Fatalf("usage-shaped input must not reach the API, got %d calls", calls)
+	}
+}
+
+func TestAskSucceedsWhenTracingConfigIsBroken(t *testing.T) {
+	srv, _ := serve(t, 200, okBody, nil)
+	t.Setenv("OTEL_CONFIG_FILE", "/nonexistent/otel.yaml")
+	var out, errOut bytes.Buffer
+	args := append([]string{"ask"}, baseArgs(srv.URL)...)
+	code := Main(args, strings.NewReader(requestJSON), &out, &errOut)
+	if code != ExitOK {
+		t.Fatalf("exit %d want %d; stdout %s stderr %s", code, ExitOK, out.String(), errOut.String())
+	}
+	if !strings.Contains(errOut.String(), "jev: tracing disabled:") {
+		t.Fatalf("stderr must explain the disabled tracing, got %q", errOut.String())
+	}
+	if !strings.Contains(out.String(), `"model":"jev-1.13.0"`) {
+		t.Fatalf("the answer must still be printed, got %q", out.String())
+	}
+}
