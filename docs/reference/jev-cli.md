@@ -1,0 +1,334 @@
+---
+title: "jev CLI"
+description: "The jev binary: global flags, the ask/models/version subcommands, their input and output JSON shapes, telemetry-related environment variables, and exit codes."
+type: reference
+---
+
+# jev CLI
+
+Binary: `jev` (built at `./bin/jev`). Source: `internal/cli`.
+
+## Synopsis
+
+```
+$ ./bin/jev --help
+jev sends a state and a set of typed questions (noul, choice, score) to the TypeSafe System One API and prints the answers as JSON.
+
+Usage:
+  jev [command]
+
+Available Commands:
+  ask         Send a state and typed questions, print the answers as JSON
+  completion  Generate the autocompletion script for the specified shell
+  help        Help about any command
+  models      List the models available to the account as JSON
+  version     Print version information as JSON
+
+Flags:
+      --api-key string     TypeSafe API key (env TYPESAFE_API_KEY)
+      --base-url string    API base URL (env TYPESAFE_BASE_URL)
+  -h, --help               help for jev
+      --log-level string   debug|info|warning|error|off (env TYPESAFE_LOG_LEVEL)
+      --max-retries int    retries after the first attempt (default 2) (default -1)
+      --model string       model name (env TYPESAFE_DEFAULT_MODEL; default jev-latest)
+      --no-trace           disable tracing even when HONEYCOMB_API_KEY or OTEL_* is set
+      --pretty             indent JSON output
+      --timeout duration   per-attempt HTTP timeout (default 10s)
+      --trace              force OpenTelemetry tracing on
+
+Use "jev [command] --help" for more information about a command.
+```
+
+`completion` and `help` are provided by the underlying Cobra command framework and are not detailed further on this page.
+
+## Global flags
+
+These are persistent flags (Cobra `PersistentFlags`, defined in `internal/cli/root.go`, `NewRootCmd`). They apply to every subcommand and appear under "Global Flags" in each subcommand's own `--help` output.
+
+| Flag | Type | Flag default | Env fallback | `--help` description |
+|---|---|---|---|---|
+| `--api-key` | string | `""` | `TYPESAFE_API_KEY` | TypeSafe API key (env TYPESAFE_API_KEY) |
+| `--base-url` | string | `""` | `TYPESAFE_BASE_URL` | API base URL (env TYPESAFE_BASE_URL) |
+| `--model` | string | `""` | `TYPESAFE_DEFAULT_MODEL` | model name (env TYPESAFE_DEFAULT_MODEL; default jev-latest) |
+| `--timeout` | duration | `0` | — | per-attempt HTTP timeout (default 10s) |
+| `--max-retries` | int | `-1` | — | retries after the first attempt (default 2) |
+| `--log-level` | string | `""` | `TYPESAFE_LOG_LEVEL` | debug\|info\|warning\|error\|off (env TYPESAFE_LOG_LEVEL) |
+| `--trace` | bool | `false` | — | force OpenTelemetry tracing on |
+| `--no-trace` | bool | `false` | — | disable tracing even when HONEYCOMB_API_KEY or OTEL_* is set |
+| `--pretty` | bool | `false` | — | indent JSON output |
+| `-h`, `--help` | bool | `false` | — | help for jev |
+
+`clientOptions` (`internal/cli/root.go`) turns non-zero/non-default `globals` fields into `typesafe.Option` values; a flag left at its Go zero value (or sentinel, for `--max-retries`) is omitted, letting the `typesafe` package's own default (env var, then package default — see the [client options and environment reference](./client-options-and-environment.md)) apply.
+
+### `--max-retries` sentinel value
+
+The flag's default is `-1`, not the library's retry default of `2` shown in the `--help` text. `-1` means "flag not set." `clientOptions` builds a `typesafe.RetryPolicy` override (starting from `typesafe.DefaultRetryPolicy()` with `MaxRetries` replaced) only when `g.maxRetries >= 0`. Passing `--max-retries 0` is a valid, non-sentinel value that disables retries.
+
+### `--timeout` unset value
+
+The flag's Go zero value is `0` (unset), not the library's 10-second default shown in the `--help` text. `clientOptions` calls `typesafe.WithTimeout(g.timeout)` only when `g.timeout > 0`. When the flag is left at `0`, `typesafe.DefaultTimeout` (`10 * time.Second`) applies at the library level. There is no way to pass `0` through this flag to request `typesafe.WithTimeout(0)` (which disables the per-attempt timeout at the library level); on the CLI, `0` always means "flag not set."
+
+## `jev ask`
+
+```
+$ ./bin/jev ask --help
+Send one System One request and print the response as JSON.
+
+Two input modes:
+
+  JSON   jev ask -f request.json        (or pipe the JSON to stdin)
+         The document is the HTTP body shape:
+         {"state": ..., "questions": {"id": {"type": "noul", ...}}, "model": "..."}
+
+  Flags  jev ask --state "text" --noul billing="Is this about billing?" \
+             --choice tone="What is the tone?:calm,angry" \
+             --score urgency="How urgent?:low|medium|high"
+
+Output: {"model": ..., "answers": {...}, "usage": {...}, "request_id": ...}
+
+Usage:
+  jev ask [flags]
+
+Flags:
+      --choice stringArray   key=instructions:label1,label2,... (repeatable)
+  -f, --file string          request JSON file; '-' or omitted reads stdin
+  -h, --help                 help for ask
+      --noul stringArray     key=instructions (repeatable)
+      --raw                  print the server response body unchanged
+      --score stringArray    key=instructions:level0|level1|... (repeatable)
+      --state string         state text, @path to read a file, or '-' for stdin
+
+Global Flags:
+      --api-key string     TypeSafe API key (env TYPESAFE_API_KEY)
+      --base-url string    API base URL (env TYPESAFE_BASE_URL)
+      --log-level string   debug|info|warning|error|off (env TYPESAFE_LOG_LEVEL)
+      --max-retries int    retries after the first attempt (default 2) (default -1)
+      --model string       model name (env TYPESAFE_DEFAULT_MODEL; default jev-latest)
+      --no-trace           disable tracing even when HONEYCOMB_API_KEY or OTEL_* is set
+      --pretty             indent JSON output
+      --timeout duration   per-attempt HTTP timeout (default 10s)
+      --trace              force OpenTelemetry tracing on
+```
+
+### Flags
+
+| Flag | Type | Default | Repeatable | Description |
+|---|---|---|---|---|
+| `-f`, `--file` | string | `""` | No | Request JSON file; `-` or omitted reads stdin. |
+| `--state` | string | `""` | No | State text, `@path` to read a file, or `-` for stdin. |
+| `--noul` | stringArray | none | Yes | `key=instructions` |
+| `--choice` | stringArray | none | Yes | `key=instructions:label1,label2,...` |
+| `--score` | stringArray | none | Yes | `key=instructions:level0\|level1\|...` |
+| `--raw` | bool | `false` | No | Print the server response body unchanged. |
+
+### Input modes
+
+`jev ask` accepts exactly one of two mutually exclusive input modes, decided by `buildRequest` (`internal/cli/ask.go`): question flags (`--state`, `--noul`, `--choice`, `--score`; any one of them present triggers flag mode) versus JSON (`-f`/stdin). Combining `-f` with any question flag is an error:
+
+```
+--file cannot be combined with --state, --noul, --choice, or --score
+```
+
+#### JSON mode
+
+```
+jev ask -f request.json
+jev ask < request.json
+```
+
+Used when `-f` is given, or when `-f` is empty/omitted and no question flags are set (in which case JSON is read from stdin). The document is the HTTP request body shape:
+
+```json
+{
+  "state": "...",
+  "questions": { "<id>": { "type": "noul", "...": "..." } },
+  "model": "..."
+}
+```
+
+Parsing rules (`parseRequestJSON`, `internal/cli/request.go`):
+
+- `state` is required (error: `invalid request: "state" is required`).
+- `questions` is required (error: `invalid request: "questions" is required`); each entry must be a JSON object with a string `type` field (error otherwise: `invalid request: questions.<id>: must be an object with a "type"`, or `invalid request: questions.<id>.type: is required`). `type` of `"noul"`, `"choice"`, or `"score"` is decoded into `typesafe.Noul`, `typesafe.Choice`, or `typesafe.Score` respectively; any other `type` value is decoded into a `typesafe.RawQuestion` (passed through unmodeled).
+- `model` is optional and, if present, becomes the request's model (see Model selection, below).
+- Any other top-level field is collected and sent via `typesafe.WithExtraBody`.
+- An empty document (after trimming whitespace) is an error: `no request given: pass --file, pipe JSON to stdin, or use --state with --noul/--choice/--score`.
+- Malformed JSON is reported as `invalid request JSON: <json error>` (top-level) or `invalid request: <field>: <json error>` (per-field).
+
+#### Flag mode
+
+```
+jev ask --state "text" --noul billing="Is this about billing?" \
+    --choice tone="What is the tone?:calm,angry" \
+    --score urgency="How urgent?:low|medium|high"
+```
+
+Used when any of `--state`, `--noul`, `--choice`, `--score` is set. Parsing rules (`requestFromFlags`, `internal/cli/ask.go`):
+
+- `--state` is required whenever `--noul`, `--choice`, or `--score` is given (error: `--state is required when using --noul, --choice, or --score`).
+- `--state` value resolution: `-` reads state from stdin; a value starting with `@` reads the remainder as a file path; any other value is used literally as text.
+- `--noul key=instructions`: split on the first `=` (error on a missing/leading `=`: `--noul "<value>": expected key=instructions`). Produces `typesafe.Noul{Instructions: instructions}` with no criteria.
+- `--choice key=instructions:label1,label2,...`: split on the first `=`, then the remainder on the first `:` into instructions and a comma-separated label list (error on a missing `:`: `--choice "<value>": expected key=instructions:labels`; error on an empty label: `--choice "<value>": empty label`). Produces `typesafe.Choice{Instructions: instructions, Criteria: {label: nil, ...}}`.
+- `--score key=instructions:level0|level1|...`: same split as `--choice` but levels are `|`-separated and at least two are required (error: `--score "<value>": needs at least two levels separated by |`). Produces `typesafe.Score{Instructions: instructions, Criteria: [level0, level1, ...]}`.
+- A question key repeated across `--noul`/`--choice`/`--score` is an error: `duplicate question key "<key>"`.
+
+### `--raw`
+
+Without `--raw`, `jev ask` writes its own JSON encoding of the decoded `*typesafe.SystemOneResponse` via the shared `writeJSON` helper (honoring `--pretty`). With `--raw`, it writes `res.Raw.Body` — the server's response bytes, unchanged — followed by a trailing newline; `--pretty` has no effect on `--raw` output.
+
+### Output shape (non-`--raw`)
+
+```json
+{
+  "model": "...",
+  "answers": { "<id>": { "type": "noul|choice|score", "...": "..." } },
+  "usage": { "input_tokens": 0, "output_tokens": 0 },
+  "request_id": "..."
+}
+```
+
+This is the JSON encoding of `typesafe.SystemOneResponse`. Per-answer wire shapes (`NoulAnswer`, `ChoiceAnswer`, `ScoreAnswer`) are documented on the [response types reference](./response-types.md). `request_id` is omitted when empty.
+
+### Model selection
+
+If the parsed request has a non-empty `Model` (from JSON mode's `"model"` field; flag mode never sets it) and `--model` was **not** explicitly passed on the command line (`cmd.Flags().Changed("model")` is `false`), the request's model is sent via `typesafe.WithRequestModel`, overriding the client's configured model for that call only. If `--model` was passed explicitly, it wins (the client-level model set through `clientOptions`/`typesafe.WithModel` applies, and the request's `Model` field is not separately forwarded).
+
+## `jev models`
+
+```
+$ ./bin/jev models --help
+List the models available to the account as JSON
+
+Usage:
+  jev models [flags]
+
+Flags:
+  -h, --help   help for models
+
+Global Flags:
+      --api-key string     TypeSafe API key (env TYPESAFE_API_KEY)
+      --base-url string    API base URL (env TYPESAFE_BASE_URL)
+      --log-level string   debug|info|warning|error|off (env TYPESAFE_LOG_LEVEL)
+      --max-retries int    retries after the first attempt (default 2) (default -1)
+      --model string       model name (env TYPESAFE_DEFAULT_MODEL; default jev-latest)
+      --no-trace           disable tracing even when HONEYCOMB_API_KEY or OTEL_* is set
+      --pretty             indent JSON output
+      --timeout duration   per-attempt HTTP timeout (default 10s)
+      --trace              force OpenTelemetry tracing on
+```
+
+No command-specific flags. Calls `typesafe.Client.ListModels` and prints the JSON encoding of the result:
+
+```json
+{ "models": [ ... ], "request_id": "..." }
+```
+
+`ListModelsResponse` and `ModelMetadata` are documented on the [response types reference](./response-types.md).
+
+## `jev version`
+
+```
+$ ./bin/jev version --help
+Print version information as JSON
+
+Usage:
+  jev version [flags]
+
+Flags:
+  -h, --help   help for version
+
+Global Flags:
+      --api-key string     TypeSafe API key (env TYPESAFE_API_KEY)
+      --base-url string    API base URL (env TYPESAFE_BASE_URL)
+      --log-level string   debug|info|warning|error|off (env TYPESAFE_LOG_LEVEL)
+      --max-retries int    retries after the first attempt (default 2) (default -1)
+      --model string       model name (env TYPESAFE_DEFAULT_MODEL; default jev-latest)
+      --no-trace           disable tracing even when HONEYCOMB_API_KEY or OTEL_* is set
+      --pretty             indent JSON output
+      --timeout duration   per-attempt HTTP timeout (default 10s)
+      --trace              force OpenTelemetry tracing on
+```
+
+No command-specific flags. Makes no network call. Prints:
+
+```json
+{ "version": "...", "commit": "...", "go": "..." }
+```
+
+`version` and `commit` are both the `internal/version` package's `Version`/`Commit` values (the same value in a non-release build); `go` is the value of `runtime.Version()`. Because this is encoded from a Go `map[string]string`, `encoding/json` emits the keys in alphabetical order (`commit`, `go`, `version`), independent of `--pretty`. Verified against the built binary:
+
+```
+$ ./bin/jev version
+{"commit":"1c9d2bb","go":"go1.25.12","version":"1c9d2bb"}
+$ ./bin/jev --pretty version
+{
+  "commit": "1c9d2bb",
+  "go": "go1.25.12",
+  "version": "1c9d2bb"
+}
+```
+
+## Telemetry
+
+Source: `internal/cli/telemetry.go`.
+
+### Enabling tracing
+
+`telemetryEnabled` decides whether the OpenTelemetry SDK is started for the command:
+
+| Condition | Result |
+|---|---|
+| `--no-trace` passed | Tracing is disabled. This check runs first and short-circuits every other condition. |
+| Otherwise, `--trace` passed | Tracing is enabled. |
+| Otherwise, `HONEYCOMB_API_KEY` set (non-empty) | Tracing is enabled. |
+| Otherwise, `OTEL_EXPORTER_OTLP_ENDPOINT` set (non-empty) | Tracing is enabled. |
+| Otherwise, `OTEL_CONFIG_FILE` set (non-empty) | Tracing is enabled. |
+| None of the above | Tracing is disabled. |
+
+### Configuration source
+
+`telemetryConfig` chooses how the enabled configuration is built:
+
+| `OTEL_CONFIG_FILE` | Behavior |
+|---|---|
+| Set (non-empty) | The named file's bytes are read, then `${VAR}`-expanded against the environment via `os.Expand`, then parsed as OpenTelemetry YAML configuration via `otelconf.ParseYAML`. The parsed configuration is used directly — `HONEYCOMB_API_KEY`, `OTEL_EXPORTER_OTLP_ENDPOINT`, and `OTEL_SERVICE_NAME` are not consulted. |
+| Unset | A configuration is built from `HONEYCOMB_API_KEY`, `OTEL_EXPORTER_OTLP_ENDPOINT`, and `OTEL_SERVICE_NAME` (below), via `buildTelemetryConfig`. |
+
+### Built configuration (no `OTEL_CONFIG_FILE`)
+
+| Environment variable | Default when unset | Effect |
+|---|---|---|
+| `HONEYCOMB_API_KEY` | — | When non-empty, added as an `x-honeycomb-team` HTTP header on the OTLP exporter. |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | `https://api.honeycomb.io` | A trailing `/` is trimmed; `/v1/traces` is appended if the (trimmed) value does not already end with it. |
+| `OTEL_SERVICE_NAME` | `jev` | Set as the `service.name` resource attribute. |
+
+The resulting configuration (`buildTelemetryConfig`) is `FileFormat: "1.0"` with a single tracer provider processor: a batch span processor exporting via OTLP/HTTP to the resolved endpoint.
+
+### Failure handling
+
+A telemetry setup failure — reading or parsing `OTEL_CONFIG_FILE`, or SDK construction — is reported on stderr as:
+
+```
+jev: tracing disabled: <error>
+```
+
+and the command proceeds with tracing disabled (`typesafe.Instrumentation` is `nil` for that run); it never stops the command from otherwise succeeding. A shutdown failure (during the deferred SDK shutdown) is separately reported as:
+
+```
+jev: tracing shutdown: <error>
+```
+
+## Exit codes
+
+| Code | Constant | Condition |
+|---|---|---|
+| 0 | `ExitOK` | Success. |
+| 1 | `ExitUsage` | Bad flags, unreadable or invalid request JSON, missing API key. |
+| 2 | `ExitValidation` | Request failed client-side validation. |
+| 3 | `ExitAuth` | 401 or 403. |
+| 4 | `ExitRequest` | Other 4xx: 400, 404, 422. |
+| 5 | `ExitRateLimit` | 429 after retries. |
+| 6 | `ExitServer` | 5xx after retries, or an unreadable 2xx body. |
+| 7 | `ExitConnection` | Connection failure or timeout. |
+
+The full error-type-to-exit-code classification and the error JSON shape written to stdout on failure are documented on the [errors and exit codes reference](./errors-and-exit-codes.md).
