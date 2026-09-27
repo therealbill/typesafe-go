@@ -163,3 +163,39 @@ func TestDecodeDefaultsMissingMaps(t *testing.T) {
 		t.Fatalf("legend and probabilities should be empty, got legend=%v probabilities=%v", s.Legend, s.Probabilities)
 	}
 }
+
+func TestUnknownAnswerMarshalRoundTrip(t *testing.T) {
+	raw := `{"type":"vibe","vibe":"good","extra":[1,2]}`
+	out, err := json.Marshal(UnknownAnswer{Type: "vibe", Raw: json.RawMessage(raw)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(out) != raw {
+		t.Fatalf("raw bytes must be returned unchanged\n got %s\nwant %s", out, raw)
+	}
+	out, err = json.Marshal(UnknownAnswer{Type: "vibe"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(out) != `{"type":"vibe"}` {
+		t.Fatalf("an empty Raw must marshal to just the type, got %s", out)
+	}
+
+	// A decoded response carrying an unknown answer survives a marshal.
+	res, err := decodeSystemOne([]byte(`{"model":"m","answers":{"v":{"type":"vibe","vibe":"good"}},"usage":{}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err = json.Marshal(res)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var probe map[string]any
+	if err := json.Unmarshal(out, &probe); err != nil {
+		t.Fatal(err)
+	}
+	v, ok := probe["answers"].(map[string]any)["v"].(map[string]any)
+	if !ok || v["type"] != "vibe" || v["vibe"] != "good" {
+		t.Fatalf("unknown answer lost its fields through marshal: %s", out)
+	}
+}
