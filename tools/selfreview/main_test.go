@@ -38,6 +38,15 @@ func TestBuildQuestions(t *testing.T) {
 	if qs["thoroughness"].(map[string]any)["type"] != "score" || qs["weakest_area"].(map[string]any)["type"] != "choice" {
 		t.Fatal("wrong question types")
 	}
+	labels := qs["weakest_area"].(map[string]any)["criteria"].(map[string]any)
+	for _, want := range []string{"validation", "error_mapping", "retry", "decoding", "encoding", "logging", "none"} {
+		if _, ok := labels[want]; !ok {
+			t.Fatalf("weakest_area is missing the %q label", want)
+		}
+	}
+	if len(labels) != 7 {
+		t.Fatalf("weakest_area has %d labels, want 7", len(labels))
+	}
 }
 
 func TestBundleTruncates(t *testing.T) {

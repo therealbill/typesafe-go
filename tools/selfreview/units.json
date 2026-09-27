@@ -4,7 +4,7 @@
     {
       "name": "questions",
       "spec_heading": "### Questions",
-      "implementation": ["question.go"],
+      "implementation": ["question.go", "errors.go"],
       "tests": ["question_test.go"],
       "behaviors": [
         "Noul.Criteria is omitted from the wire JSON when nil",

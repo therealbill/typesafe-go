@@ -267,6 +267,7 @@ func buildQuestions(u unit) map[string]any {
 			"error_mapping": "Turning HTTP statuses and transport failures into error types.",
 			"retry":         "Backoff, Retry-After, budget, and cancellation.",
 			"decoding":      "Turning response JSON into answer types.",
+			"encoding":      "Turning questions and state into wire JSON.",
 			"logging":       "What is and is not logged.",
 			"none":          "No area stands out.",
 		},
