@@ -6254,21 +6254,21 @@ git commit -m "Add README, license, and validate documentation"
 
 **Agent:** lead (after Tasks 20, 22 committed; all agents idle)
 
-- [ ] **Step 1: Run the full self-review**
+- [x] **Step 1: Run the full self-review**
 
 ```bash
 make selfreview 2>&1 | tee /private/tmp/claude-501/-Users-bill-Projects-gojev/b96adec7-3da2-45f5-b6b1-95fdebc40eb3/scratchpad/selfreview.md
 ```
 Expected: a table with one row per unit. Exit code 0 means nothing is flagged.
 
-- [ ] **Step 2: Triage each flag**
+- [x] **Step 2: Triage each flag**
 
 For each flagged line (`covers_NN`, `contradicts_spec`, `thoroughness`), read the named behavior, the test file, and the implementation. Decide:
 
 - **Real gap:** send the owning agent (`core` for library units, `otel` for otel, `cli` for cli) a message naming the unit, the behavior text, and the file to add a test to or the code to fix. The agent adds the test first, watches it fail if it is a code fix, fixes, runs `go test -race ./...`, commits by explicit path, and reports the commit hash.
 - **Model miss** (the test exists and asserts the behavior): add the question id to that unit's `accepted` list in `tools/selfreview/units.json` with a sibling `"notes"` entry such as `"covers_03: TestSystemOneBudgetExhausted asserts this"`, so the acceptance is recorded next to the reason.
 
-- [ ] **Step 3: Rerun until clean**
+- [x] **Step 3: Rerun until clean**
 
 ```bash
 make selfreview
