@@ -77,6 +77,17 @@ question. Third, easier unit testing of the core itself: tests exercise
 `Instrumentation` implementations, with no exporter, no collector, and no
 OTel SDK initialization anywhere in the test binary.
 
+The `jev` binary itself now demonstrates the cost the core package avoids.
+`go.mod` carries about 90 requirements marked `// indirect` — essentially
+all of them pulled in once `go.opentelemetry.io/contrib/otelconf` enters the
+graph through the CLI's exporter-configuration code, dragging in the AWS
+SDK, Kubernetes' `client-go`, Prometheus's client libraries, and several
+OTLP exporters along with it. None of that is reachable from the root
+`typesafe` package, which still has zero non-stdlib dependencies. The built
+`jev` binary is about 25MB, most of it that exporter and cloud-SDK code —
+weight a caller of the bare library never links in. A reader can compare
+the two dependency graphs directly in the same `go.mod`.
+
 ## What you give up by default
 
 The trade is explicit: with no `Instrumentation` attached, a `Client`

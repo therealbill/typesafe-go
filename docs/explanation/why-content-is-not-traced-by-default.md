@@ -76,7 +76,7 @@ positioned to make it responsibly, rather than making it implicitly for them.
 
 Turning content recording off doesn't mean the span is empty. A fixed set of
 attributes is always present, since each describes the call's shape and
-outcome, not what it was about: `gen_ai.system`,
+outcome, not what it was about: `gen_ai.provider.name`, `gen_ai.system`,
 `gen_ai.request.model`, `gen_ai.response.model`, token usage
 (`gen_ai.usage.input_tokens` / `output_tokens`), `typesafe.request_id`,
 question counts by type (`typesafe.questions.count`, `.noul`, `.choice`,
