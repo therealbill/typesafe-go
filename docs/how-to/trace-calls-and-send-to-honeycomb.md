@@ -73,6 +73,7 @@ trimmed to the attributes that matter here):
   "Name": "typesafe.system_one",
   "Attributes": [
     {"Key": "gen_ai.provider.name", "Value": {"Value": "typesafe"}},
+    {"Key": "gen_ai.operation.name", "Value": {"Value": "system_one"}},
     {"Key": "gen_ai.request.model", "Value": {"Value": "jev-latest"}},
     {"Key": "typesafe.questions.count", "Value": {"Value": 1}},
     {"Key": "typesafe.state", "Value": {"Value": "{\"ticket\":\"I was charged twice this month.\"}"}},
@@ -86,6 +87,9 @@ trimmed to the attributes that matter here):
 }
 ```
 
+`gen_ai.operation.name` is always set to the operation string (`system_one`
+here, `list_models` for `ListModels`) — the same value used to build the
+span name `typesafe.<operation>`.
 `typesafe.state` and `typesafe.questions` (from `WithRecordContent`) and
 `typesafe.answer.tone.*` (from `WithRecordAnswers`) are exactly the
 attributes that disappear if you drop those two options. Full key list and
@@ -116,14 +120,13 @@ export HONEYCOMB_API_KEY=your-honeycomb-key
 ./bin/jev ask --state "..." --noul billing="Is this about billing?"
 ```
 
-This is enough by itself to enable tracing (Step 4) and to send an
-`x-honeycomb-team` header on the OTLP/HTTP export to
-`https://api.honeycomb.io/v1/traces`.
+This is enough by itself to enable tracing (Step 4) and send an
+`x-honeycomb-team` header on the OTLP/HTTP export.
 
-For anything beyond that default — a different region, additional
-processors, sampling — set `OTEL_CONFIG_FILE` to a YAML file. It is read and
-`${VAR}`-expanded against your environment before being parsed, so it can
-reference `${HONEYCOMB_API_KEY}` without the key ever living in the file:
+For anything beyond that default — a different region, more processors,
+sampling — set `OTEL_CONFIG_FILE` to a YAML file, read and `${VAR}`-expanded
+against your environment before parsing, so it can reference
+`${HONEYCOMB_API_KEY}` without the key living in the file:
 
 ```yaml
 file_format: "1.0"
@@ -137,6 +140,10 @@ tracer_provider:
               - name: x-honeycomb-team
                 value: ${HONEYCOMB_API_KEY}
 ```
+
+If this file fails to parse, every `${VAR}`-expanded secret is redacted from
+the resulting stderr message — a YAML error near `${HONEYCOMB_API_KEY}`
+can't leak the key's value.
 
 ## Verify it works
 
@@ -154,10 +161,9 @@ a trace in Honeycomb showing `typesafe.system_one` with a child HTTP span.
 ## Two things to know before you rely on this
 
 **A misconfigured exporter never fails the command.** Run `jev ask --trace`
-with no `HONEYCOMB_API_KEY` and no collector listening, and the command
-still succeeds — `jev`'s own exit code and stdout are independent of
-whether the best-effort trace export succeeds. Captured on this machine,
-right now:
+with no `HONEYCOMB_API_KEY` and no collector listening — the command still
+succeeds; exit code and stdout are independent of whether the best-effort
+trace export succeeds. Captured on this machine, right now:
 
 ```
 $ ./bin/jev ask --trace --state "..." --noul billing="Is this about billing?"
@@ -166,15 +172,14 @@ $ ./bin/jev ask --trace --state "..." --noul billing="Is this about billing?"
 ```
 
 Exit code 0. That stderr line comes from the OTel SDK's own default error
-handler when the batch span processor tries to flush — not from any
-`jev:`-prefixed message — and a tracing misconfiguration must never turn a
-working `ask`/`models` call into a failure.
+handler, not a `jev:`-prefixed message — a tracing misconfiguration must
+never turn a working `ask`/`models` call into a failure.
 
 **`jev` is a much heavier binary than the core library.** The root
 `typesafe` package has zero dependencies; `jev`'s `go.mod` carries roughly
-90 indirect requirements once `otelconf` is in the graph, including the AWS
-SDK, Kubernetes' `client-go`, Prometheus's client libraries, and several
-OTLP exporters — none of which the core client needs or imports. See
+90 indirect requirements once `otelconf` is in the graph — the AWS SDK,
+Kubernetes' `client-go`, Prometheus's client libraries, several OTLP
+exporters — none of which the core client needs. See
 [Why the Core Is Stdlib-Only](../explanation/why-the-core-is-stdlib-only.md)
 for why that split exists and how to get tracing without paying for it in
 your own binary.
@@ -200,7 +205,8 @@ works, independent of environment detection.
 **Cause**: `OTEL_CONFIG_FILE` failed to read or parse, or SDK construction
 itself failed — this happens before any request, not during export.
 **Solution**: validate the YAML with `otelconf.ParseYAML` semantics in mind
-(the schema shown in Step 5), and confirm the path is readable.
+(the schema shown in Step 5), and confirm the path is readable. Safe to
+paste into a bug report — any `${VAR}`-expanded secret is already redacted.
 
 ### Problem: state/questions never appear on the span
 **Symptom**: everything else on the span is populated, but no

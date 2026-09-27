@@ -76,6 +76,7 @@ by wrapping the client's HTTP transport (`otelhttp`); those child spans carry
 const (
     AttrProviderName  = "gen_ai.provider.name"
     AttrSystem        = "gen_ai.system"
+    AttrOperationName = "gen_ai.operation.name"
     AttrRequestModel  = "gen_ai.request.model"
     AttrResponseModel = "gen_ai.response.model"
     AttrInputTokens   = "gen_ai.usage.input_tokens"
@@ -107,13 +108,14 @@ in `otel/otel.go` sets the start-of-span attributes from the
 |---|---|---|---|---|
 | `AttrProviderName` | `gen_ai.provider.name` | `typesafe.system_one`, `typesafe.list_models` | Always, at span start. | Literal `ProviderName` (`"typesafe"`). |
 | `AttrSystem` | `gen_ai.system` | `typesafe.system_one`, `typesafe.list_models` | Always, at span start. | Literal `ProviderName` (`"typesafe"`). |
+| `AttrOperationName` | `gen_ai.operation.name` | `typesafe.system_one`, `typesafe.list_models` | Always, at span start. | `RequestInfo.Operation` — the same string (`"system_one"` or `"list_models"`) used to build the span name `"typesafe." + info.Operation`. |
 | `AttrRequestModel` | `gen_ai.request.model` | `typesafe.system_one`, `typesafe.list_models` | Always, at span start. | `RequestInfo.Model`. |
 | `AttrQuestionCount` | `typesafe.questions.count` | `typesafe.system_one` only | At span start, only when `RequestInfo.Operation == "system_one"`. | `RequestInfo.QuestionCount`. |
 | `AttrNoulCount` | `typesafe.questions.noul` | `typesafe.system_one` only | At span start, only when `RequestInfo.Operation == "system_one"`. | `RequestInfo.NoulCount`. |
 | `AttrChoiceCount` | `typesafe.questions.choice` | `typesafe.system_one` only | At span start, only when `RequestInfo.Operation == "system_one"`. | `RequestInfo.ChoiceCount`. |
 | `AttrScoreCount` | `typesafe.questions.score` | `typesafe.system_one` only | At span start, only when `RequestInfo.Operation == "system_one"`. | `RequestInfo.ScoreCount`. |
-| `AttrState` | `typesafe.state` | `typesafe.system_one` only | At span start, only when `RequestInfo.Operation == "system_one"` and `WithRecordContent(maxBytes)` was configured with `maxBytes > 0`. | JSON encoding of `RequestInfo.State`, truncated to `maxBytes` bytes. |
-| `AttrQuestions` | `typesafe.questions` | `typesafe.system_one` only | At span start, only when `RequestInfo.Operation == "system_one"` and `WithRecordContent(maxBytes)` was configured with `maxBytes > 0`. | JSON encoding of `RequestInfo.Questions`, truncated to `maxBytes` bytes. |
+| `AttrState` | `typesafe.state` | `typesafe.system_one` only | At span start, only when `RequestInfo.Operation == "system_one"`, `WithRecordContent(maxBytes)` was configured with `maxBytes > 0`, and `span.IsRecording()` is true. | JSON encoding of `RequestInfo.State`, truncated to `maxBytes` bytes. |
+| `AttrQuestions` | `typesafe.questions` | `typesafe.system_one` only | At span start, only when `RequestInfo.Operation == "system_one"`, `WithRecordContent(maxBytes)` was configured with `maxBytes > 0`, and `span.IsRecording()` is true. | JSON encoding of `RequestInfo.Questions`, truncated to `maxBytes` bytes. |
 | `AttrRetryAttempts` | `typesafe.retry.attempts` | `typesafe.system_one`, `typesafe.list_models` | Always, at span end. | `RequestResult.Attempts`. |
 | `AttrHTTPStatus` | `http.response.status_code` | `typesafe.system_one`, `typesafe.list_models` | At span end, only when `RequestResult.Status != 0`. | `RequestResult.Status`. |
 | `AttrRequestID` | `typesafe.request_id` | `typesafe.system_one`, `typesafe.list_models` | At span end, only when `RequestResult.RequestID != ""`. | `RequestResult.RequestID`. |
@@ -122,10 +124,20 @@ in `otel/otel.go` sets the start-of-span attributes from the
 | `AttrOutputTokens` | `gen_ai.usage.output_tokens` | `typesafe.system_one`, `typesafe.list_models` | At span end, only when `RequestResult.Usage.OutputTokens != nil`. | `*RequestResult.Usage.OutputTokens`. |
 | `AttrErrorType` | `error.type` | `typesafe.system_one`, `typesafe.list_models` | At span end, only when `RequestResult.Err != nil`. | The Go type name of `RequestResult.Err`, with a leading `*` trimmed (for example `typesafe.APIError`). The span also records the error and sets its status to `codes.Error` with `RequestResult.Err.Error()`. |
 
+`RequestStart` only marshals `RequestInfo.State`/`RequestInfo.Questions` to
+JSON when the span will actually use the result: the check is
+`if info.Operation == "system_one" && i.contentBytes > 0 && span.IsRecording()`.
+When `span.IsRecording()` is false (for example, a sampler decided not to
+record this trace), the marshaling is skipped entirely and neither attribute
+is set, even though `WithRecordContent` is configured.
+
 Truncation (`AttrState`, `AttrQuestions`): the value is JSON-marshaled; if
-the marshaled string is longer than `maxBytes`, it is cut to `maxBytes` bytes
-with the suffix `...(truncated)` appended. If marshaling fails, the value is
-`<unencodable <Go type>>`.
+the marshaled string is longer than `maxBytes`, it is cut with
+`truncateRuneSafe` and the suffix `...(truncated)` appended. `truncateRuneSafe`
+walks the cut point back to the nearest preceding UTF-8 rune boundary rather
+than cutting the byte slice directly, so truncated content is always valid
+UTF-8 rather than potentially ending mid-character. If marshaling fails, the
+value is `<unencodable <Go type>>`.
 
 ## Answer attributes (WithRecordAnswers)
 
@@ -137,9 +149,16 @@ added at span end, in ascending key order:
 | Answer type | Attributes set |
 |---|---|
 | `typesafe.NoulAnswer` | `typesafe.answer.<key>.noul` (float64) |
-| `typesafe.ChoiceAnswer` | `typesafe.answer.<key>.choice` (string), `typesafe.answer.<key>.confidence` (float64) |
+| `typesafe.ChoiceAnswer` | `typesafe.answer.<key>.choice` (string, capped — see below), `typesafe.answer.<key>.confidence` (float64) |
 | `typesafe.ScoreAnswer` | `typesafe.answer.<key>.score` (float64), `typesafe.answer.<key>.confidence` (float64) |
 
 `typesafe.UnknownAnswer` values do not produce answer attributes. These keys
 are not `Attr*` constants; they are built as the literal prefix
 `"typesafe.answer."` plus the question identifier plus a field suffix.
+
+A `ChoiceAnswer`'s `Choice` value is truncated with `truncateRuneSafe` (the
+same rune-safe helper used for `AttrState`/`AttrQuestions`) to at most
+`maxAnswerChoiceBytes` (`= 256`) bytes before being set as the
+`typesafe.answer.<key>.choice` attribute, bounding how much a pathologically
+long label can bloat a span. `Noul` and `Score` values are numeric and are
+not truncated; only the `.choice` string attribute is capped.

@@ -68,7 +68,7 @@ The difference is what you can tell afterward:
 
 Decoding can still fail — for example, a question's answer comes back as the
 wrong type, or a required answer subfield is missing. Both surface as
-`*typesafe.ResponseValidationError`, with `FieldPath` naming what failed:
+`*typesafe.ResponseValidationError`:
 
 ```go
 var validationErr *typesafe.ResponseValidationError
@@ -78,14 +78,25 @@ if errors.As(err, &validationErr) {
 }
 ```
 
-`FieldPath` differs by what kind of validation failed. A type mismatch (your
-struct expects `NoulAnswer` but the server answered `"type":"choice"`)
-reports just `"type"`, and the accompanying `*SystemOneResponse` is still
-non-nil, because decoding into `T` is what failed. A malformed answer body —
-a missing required subfield anywhere in the response, even for a question
-your struct doesn't ask for — reports a fully qualified path like
-`"answers.tone.confidence"`, and the response is `nil`, because `SystemOne`
-itself failed to decode. Check `resp == nil` before using it.
+`FieldPath` and `Error()` carry different information depending on what kind
+of validation failed, so check both. A type mismatch (your struct expects
+`NoulAnswer` but the server answered `"type":"choice"`) sets `FieldPath` to
+the constant string `"type"` — it never names the struct field or the
+question identifier that failed. The useful diagnostic lives in the error
+message instead: `Error()` explicitly names the expected and actual answer
+type, for example:
+
+```
+typesafe: invalid response field "type": expected noul answer, got choice
+```
+
+The accompanying `*SystemOneResponse` is still non-nil for this case,
+because decoding into `T` is what failed, not the initial decode of the
+response itself. A malformed answer body — a missing required subfield
+anywhere in the response, even for a question your struct doesn't ask for —
+reports a fully qualified `FieldPath` like `"answers.tone.confidence"`
+instead, and the response is `nil`, because `SystemOne` itself failed to
+decode. Check `resp == nil` before using it.
 
 ### 5. Keep the returned `*SystemOneResponse` for `Usage` and `RequestID`
 

@@ -61,11 +61,20 @@ Use this for a call with different latency tolerance than the rest of your
 traffic — a background batch job, say, versus a request on the critical path
 of a user-facing request.
 
+Per-call options like `WithRequestRetry` are validated eagerly: `RequestOption`
+is `func(*requestConfig) error`, so a malformed value — a negative duration
+passed to `WithRequestTimeout`, for example — returns a
+`*typesafe.ValidationError` immediately, before any network call. It surfaces
+through the same `err` returned from `SystemOne`/`SystemOneAs` above, so no
+special error-handling pattern is needed — just don't assume only server
+responses can produce an error here.
+
 ### 3. Detect a rate limit and read `RetryAfter`
 
 When the API returns 429, the SDK surfaces a `*typesafe.RateLimitError`,
 which embeds `APIError` and adds `RetryAfter time.Duration` parsed from the
-response's `Retry-After` header. Recognize it with `errors.As`:
+response's `Retry-After` header — the server's raw requested wait,
+unclamped, for your own code to inspect. Recognize it with `errors.As`:
 
 ```go
 var rateLimitErr *typesafe.RateLimitError
@@ -73,6 +82,14 @@ if errors.As(err, &rateLimitErr) {
 	fmt.Println("rate limited, retry after:", rateLimitErr.RetryAfter)
 }
 ```
+
+Separately, `RetryPolicy.MaxRetryAfter` (default 5 minutes, backfilled to
+that default automatically even in a hand-built policy) caps how long the
+SDK's *own* automatic retry loop actually waits when `HonorRetryAfter` is
+true and the server asks for longer. `HonorRetryAfter` no longer means "wait
+however long the server says" — it means "wait what the server says, up to
+`MaxRetryAfter`." This clamp never touches `RateLimitError.RetryAfter`
+itself, only the SDK's internal sleep.
 
 To see this without a live rate limit, disable the SDK's own retries
 (`MaxRetries: 0`) so the 429 surfaces immediately instead of being retried

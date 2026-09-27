@@ -64,7 +64,7 @@ Returns `"typesafe: <Endpoint> returned <Status>"`, with `": <Message()>"` appen
 func (e *APIError) Message() string
 ```
 
-Message extracts a human-readable message from the body. It understands the API's `"detail"` envelope in its string, object, and array forms, falls back to `"message"` or `"error"` fields, and otherwise returns the trimmed body, truncated to 200 bytes.
+Message extracts a human-readable message from the body. It understands the API's `"detail"` envelope in its string, object, and array forms, falls back to `"message"` or `"error"` fields, and otherwise returns the trimmed body. Every one of those code paths converges on a single return that first coerces the body to valid UTF-8 (`strings.ToValidUTF8(msg, "�")`, replacing invalid byte sequences with `�`) and then truncates the result to 200 bytes (`maxMessageLen`) without splitting a multi-byte UTF-8 rune — `truncate` walks back to the nearest rune boundary before cutting, appending `"..."` when a cut was made.
 
 ### RateLimitError
 
@@ -154,42 +154,86 @@ Source: `internal/cli/exit.go`.
 
 ```go
 const (
-    ExitOK         = 0
-    ExitUsage      = 1 // bad flags, unreadable or invalid request JSON, missing API key
-    ExitValidation = 2 // request failed client-side validation
-    ExitAuth       = 3 // 401 or 403
-    ExitRequest    = 4 // other 4xx: 400, 404, 422
-    ExitRateLimit  = 5 // 429 after retries
-    ExitServer     = 6 // 5xx after retries, or an unreadable 2xx body
-    ExitConnection = 7 // connection failure or timeout
+    ExitOK          = 0
+    ExitUsage       = 1   // bad flags, unreadable or invalid request JSON, missing API key, or an unrecognized error
+    ExitValidation  = 2   // request failed client-side validation
+    ExitAuth        = 3   // 401 or 403
+    ExitRequest     = 4   // other 4xx: 400, 404, 422
+    ExitRateLimit   = 5   // 429 after retries
+    ExitServer      = 6   // 5xx after retries, or an unreadable 2xx body
+    ExitConnection  = 7   // connection failure or timeout
+    ExitInterrupted = 130 // the context was cancelled, conventionally by SIGINT
 )
 ```
+
+The `"kind"` field of the error JSON (below) names the case more precisely
+than the exit code: code 1 covers two distinct `kind` values, `"usage"` and
+`"internal"`.
 
 | Constant | Code | Condition |
 |---|---|---|
 | `ExitOK` | 0 | Success. |
-| `ExitUsage` | 1 | Bad flags, unreadable or invalid request JSON, missing API key. |
+| `ExitUsage` | 1 | Bad flags, unreadable or invalid request JSON, missing API key, or an unrecognized error. Covers `kind` `"usage"` and `kind` `"internal"` — see the classification table below. |
 | `ExitValidation` | 2 | Request failed client-side validation. |
 | `ExitAuth` | 3 | 401 or 403. |
 | `ExitRequest` | 4 | Other 4xx: 400, 404, 422. |
 | `ExitRateLimit` | 5 | 429 after retries. |
 | `ExitServer` | 6 | 5xx after retries, or an unreadable 2xx body. |
 | `ExitConnection` | 7 | Connection failure or timeout. |
+| `ExitInterrupted` | 130 | The context was cancelled, conventionally by SIGINT. |
 
 ## jev CLI: error classification
 
-`classify(err error) (int, string)` in `internal/cli/exit.go` maps a returned error to an exit code and to the `"kind"` string carried in the error JSON (below). The checks run in this order; the first match wins, each using `errors.As` so a wrapped error matches whenever it satisfies the target type via `Unwrap()`.
+`classify(err error) (int, string)` in `internal/cli/exit.go` maps a returned error to an exit code and to the `"kind"` string carried in the error JSON (below). The checks run in this order; the first match wins, each using `errors.As`/`errors.Is` so a wrapped error matches whenever it satisfies the target type or value via `Unwrap()`.
 
-| Order | Go error type checked | Condition | Exit code | `kind` |
+| Order | Go error type/value checked | Condition | Exit code | `kind` |
 |---|---|---|---|---|
-| 1 | `*typesafe.ValidationError` | any | `ExitValidation` (2) | `"validation"` |
-| 2 | `*typesafe.RateLimitError` | any | `ExitRateLimit` (5) | `"rate_limit"` |
-| 3 | `*typesafe.APIError` | `Status == 401 \|\| Status == 403` | `ExitAuth` (3) | `"auth"` |
-| 4 | `*typesafe.APIError` | `Status >= 500` | `ExitServer` (6) | `"server"` |
-| 5 | `*typesafe.APIError` | otherwise (e.g. 400, 404, 422) | `ExitRequest` (4) | `"request"` |
-| 6 | `*typesafe.ConnectionError` | any (includes `*typesafe.TimeoutError`, which embeds it) | `ExitConnection` (7) | `"connection"` |
-| 7 | `*typesafe.ResponseValidationError` | any | `ExitServer` (6) | `"invalid_response"` |
-| — | none of the above | — | `ExitUsage` (1) | `"usage"` |
+| 1 | `errors.Is(err, context.Canceled)` | any | `ExitInterrupted` (130) | `"interrupted"` |
+| 2 | `*usageError`, or `errors.Is(err, typesafe.ErrMissingAPIKey)` | any | `ExitUsage` (1) | `"usage"` |
+| 3 | `*typesafe.ValidationError` | any | `ExitValidation` (2) | `"validation"` |
+| 4 | `*typesafe.RateLimitError` | any | `ExitRateLimit` (5) | `"rate_limit"` |
+| 5 | `*typesafe.APIError` | `Status == 401 \|\| Status == 403` | `ExitAuth` (3) | `"auth"` |
+| 6 | `*typesafe.APIError` | `Status >= 500` | `ExitServer` (6) | `"server"` |
+| 7 | `*typesafe.APIError` | otherwise (e.g. 400, 404, 422) | `ExitRequest` (4) | `"request"` |
+| 8 | `*typesafe.ConnectionError` | any (includes `*typesafe.TimeoutError`, which embeds it) | `ExitConnection` (7) | `"connection"` |
+| 9 | `*typesafe.ResponseValidationError` | any | `ExitServer` (6) | `"invalid_response"` |
+| — | none of the above | — | `ExitUsage` (1) | `"internal"` |
+
+`*usageError` (order 2) marks errors caused by how the CLI itself was
+invoked — see [Usage errors versus validation errors](#usage-errors-versus-validation-errors)
+below. The final, unlabeled row is the fallback for an error that reached
+`fail` but matched none of the typed cases; it is reported with `kind`
+`"internal"` rather than `"usage"`, even though both share exit code 1.
+
+The `"interrupted"` versus `"connection"` split is made by the CLI, not by
+the library. At the library level both cases are the same Go type: when the
+parent context passed to `SystemOne`/`ListModels` is done
+(`wrapTransportError` in `transport.go` checks `parent.Err() != nil` first),
+the request fails with `&typesafe.ConnectionError{Err: parent.Err()}` — the
+same type whatever the cause, carrying whichever error that context holds.
+`classify` is what separates them:
+
+- A SIGINT-cancelled context (`Main` installs a `signal.NotifyContext` on `os.Interrupt` and `syscall.SIGTERM`) yields `context.Canceled`, which the order-1 `errors.Is(err, context.Canceled)` check catches → `"interrupted"` (130).
+- A parent context that instead hit its own deadline yields `context.DeadlineExceeded`, which is not `context.Canceled`, so it falls through to the order-8 `*typesafe.ConnectionError` check → `"connection"` (7).
+
+A library caller wanting the same distinction must make the
+`errors.Is(err, context.Canceled)` check itself: `errors.As` against
+`*typesafe.ConnectionError` alone cannot tell the two apart. (A
+`*typesafe.TimeoutError` is unrelated to both: it is produced only by the
+per-attempt timeout from `WithTimeout`/`WithRequestTimeout`, never by the
+caller's own context.)
+
+### Usage errors versus validation errors
+
+Input the CLI itself rejects before ever calling the library — malformed
+top-level request JSON (missing `"questions"`, missing `"state"`), a blank or
+whitespace-only flag-mode question key, an unknown field inside a JSON
+question object, `--state` given without any `--noul`/`--choice`/`--score` —
+all surface as `*usageError` (exit code 1, kind `"usage"`). This is distinct
+from `*typesafe.ValidationError` (exit code 2, kind `"validation"`), which is
+the library's own semantic validation of an already-well-formed `Questions`
+map (for example a `Choice` with zero labels) performed after the CLI has
+successfully parsed the request.
 
 Verified against the built binary:
 
@@ -230,6 +274,16 @@ On failure, `fail` (`internal/cli/exit.go`) writes one JSON object to stdout:
 jev: <err>
 ```
 
+`<err>` is `sanitize(err.Error())`: `sanitize` (`internal/cli/exit.go`)
+replaces every control character except tab with a `\xNN` escape, so a
+response body containing terminal escape sequences cannot manipulate the
+user's terminal. Newline (`\n`) is one of the escaped characters, so a
+multi-line error message is collapsed onto this single stderr line (each
+newline appears as `\x0a`) rather than spanning multiple lines. This
+sanitization applies only to this stderr line, not to the stdout JSON, which
+is already safely JSON-encoded (`encoding/json` escapes control characters on
+its own).
+
 Verified against the built binary (no `*typesafe.APIError` involved, so `status` and `request_id` are both absent):
 
 ```
@@ -242,11 +296,22 @@ $ echo $?
 
 ## jev CLI: non-classified failures
 
-`Main` (`internal/cli/root.go`) calls `root.ExecuteContext(ctx)` and, when the returned error is not a `*ExitError` (for example a Cobra-level argument-parsing error that never reached `fail`/`classify`), writes to stderr:
+`runMain` (`internal/cli/root.go`) calls `root.ExecuteContext(ctx)` and, when the returned error is not a `*ExitError` (for example a Cobra-level flag-parsing or unknown-command error that never reached `fail`/`classify`), it writes both streams, mirroring a classified failure:
 
-```
-jev: <error>
-Run 'jev --help' for usage.
-```
+- stdout: the same error JSON envelope shape as `fail` produces, with `kind` hardcoded to `"usage"` (this path does not call `classify`):
 
-and returns exit code 1 (`ExitUsage`) without writing anything to stdout.
+  ```json
+  {"error": {"kind": "usage", "message": "<error>"}}
+  ```
+
+- stderr:
+
+  ```
+  jev: <sanitized error>
+  Run 'jev --help' for usage.
+  ```
+
+This makes the stdout JSON envelope unconditional: it is written on every
+non-zero exit, including a Cobra-level flag or command error rejected before
+any subcommand runs, so a caller parsing stdout never has to special-case
+invocation mistakes. It returns exit code 1 (`ExitUsage`).

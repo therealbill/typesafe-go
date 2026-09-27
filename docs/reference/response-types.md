@@ -20,6 +20,14 @@ type Answer interface {
 Answer is one decoded answer: `NoulAnswer`, `ChoiceAnswer`, `ScoreAnswer`, or
 `UnknownAnswer` for types this package does not model.
 
+### Decode error determinism
+
+Answers are decoded in sorted (alphabetical) key order, not Go's randomized
+map iteration order. When a response has more than one malformed answer,
+decoding stops at the first one encountered in that sorted order, so the
+resulting `*ResponseValidationError`'s `FieldPath` is always the alphabetically
+first bad key, consistently across repeated runs.
+
 ## NoulAnswer
 
 ```go
@@ -125,9 +133,12 @@ UnknownAnswer preserves an answer whose type this package does not know.
 |---|---|---|
 | `AnswerType` | `func (a UnknownAnswer) AnswerType() string` | Returns the wire type of the unknown answer (`Type`). |
 | `MarshalJSON` | `func (a UnknownAnswer) MarshalJSON() ([]byte, error)` | Returns the raw answer unchanged. |
+| `UnmarshalJSON` | `func (a *UnknownAnswer) UnmarshalJSON(b []byte) error` | Records the answer's `type` into `Type` and keeps the input bytes verbatim in `Raw`. |
 
 MarshalJSON behavior: if `Raw` is empty, it returns `{"type": <Type>}`;
-otherwise it returns `Raw` unchanged.
+otherwise it returns `Raw` unchanged. Because `UnmarshalJSON` stores the input
+bytes unchanged in `Raw`, decoding an `UnknownAnswer` and then re-marshaling
+it round-trips byte-for-byte.
 
 ## Usage
 
@@ -202,6 +213,15 @@ ModelMetadata describes one model available to the account.
 | `Name` | `string` | Model name. |
 | `Description` | `string` | Model description. |
 | `ReleaseDate` | `string` | The timestamp string reported by the API. |
+
+## Response size limit
+
+A response body over 16 MiB is not decoded. `SystemOne` and `ListModels`
+return `&typesafe.ResponseValidationError{FieldPath: "", Err: errors.New("response exceeds 16 MiB")}`
+instead. The check (in `transport.go`) reads one byte past the 16 MiB cap to
+detect an oversized body rather than silently truncating it into malformed
+JSON. This error carries no HTTP status: the underlying `*http.Response` is
+not returned to the caller, so it is never seen as an `*APIError`.
 
 ## SystemOneAs
 

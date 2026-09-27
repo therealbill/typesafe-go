@@ -63,7 +63,7 @@ ls -la bin/jev
 ```
 
 ```
--rwxr-xr-x  1 bill  staff  25853730 Sep 26 23:38 bin/jev
+-rwxr-xr-x  1 bill  staff  25870450 Sep 27 11:58 bin/jev
 ```
 
 You now have a working `jev` binary at `./bin/jev`. Every command in the
@@ -78,7 +78,7 @@ Run:
 ```
 
 ```json
-{"commit":"112fb62","go":"go1.27.1","version":"112fb62"}
+{"commit":"a48152b","go":"go1.27.1","version":"a48152b"}
 ```
 
 Three fields, always in alphabetical order because they come from a Go map:
