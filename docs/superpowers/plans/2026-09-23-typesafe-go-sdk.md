@@ -3691,7 +3691,7 @@ Expected: all PASS.
 **Files:**
 - Create: `Makefile`, `.golangci.yml`, `.gitignore`, `.goreleaser.yaml`, `.github/workflows/ci.yml`, `.github/workflows/release.yml`, `tools/checkdocs.sh`
 
-- [ ] **Step 1: Write `.gitignore`**
+- [x] **Step 1: Write `.gitignore`**
 
 ```
 bin/
@@ -3700,7 +3700,7 @@ coverage.out
 selfreview-report.json
 ```
 
-- [ ] **Step 2: Write `.golangci.yml`**
+- [x] **Step 2: Write `.golangci.yml`**
 
 ```yaml
 version: "2"
@@ -3722,7 +3722,7 @@ formatters:
     - goimports
 ```
 
-- [ ] **Step 3: Write `Makefile`**
+- [x] **Step 3: Write `Makefile`**
 
 ```make
 MODULE   := github.com/therealbill/typesafe-go
@@ -3766,7 +3766,7 @@ clean: ## Remove build outputs
 
 Indentation under each target must be a real tab.
 
-- [ ] **Step 4: Write `tools/checkdocs.sh`**
+- [x] **Step 4: Write `tools/checkdocs.sh`**
 
 ```bash
 #!/usr/bin/env bash
@@ -3800,7 +3800,7 @@ exit $status
 chmod +x tools/checkdocs.sh
 ```
 
-- [ ] **Step 5: Write `.goreleaser.yaml`**
+- [x] **Step 5: Write `.goreleaser.yaml`**
 
 ```yaml
 version: 2
@@ -3831,7 +3831,7 @@ release:
     name: typesafe-go
 ```
 
-- [ ] **Step 6: Write `.github/workflows/ci.yml`**
+- [x] **Step 6: Write `.github/workflows/ci.yml`**
 
 ```yaml
 name: ci
@@ -3861,7 +3861,7 @@ jobs:
           version: v2.5
 ```
 
-- [ ] **Step 7: Write `.github/workflows/release.yml`**
+- [x] **Step 7: Write `.github/workflows/release.yml`**
 
 ```yaml
 name: release
@@ -3889,7 +3889,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-- [ ] **Step 8: Verify and commit**
+- [x] **Step 8: Verify and commit**
 
 ```bash
 make help
