@@ -22,9 +22,18 @@ docs, a custom domain, analytics, comments, and any change to the Go code.
   file. The site therefore lives in `site/` with its own nested `go.mod`,
   which Go ignores.
 - Hugo can mount a parent directory: a site in `site/` mounting `../docs`
-  builds correctly, and Hugo's default link render hook resolves the existing
+  builds correctly, and Hextra's own link render hook resolves the existing
   `../reference/x.md` cross-links to page URLs (verified 2026-09-28 with Hugo
-  0.166.0).
+  0.166.0 and Hextra v0.12.3). No render-hook configuration is needed; the
+  `renderHooks.link.enableDefault` key was removed in Hugo 0.148.
+- The mount `files` glob setting did not exclude a subdirectory in testing
+  (three pattern forms tried), so `docs/superpowers/` is kept out of the site
+  with Hugo build options instead: a `docs/superpowers/_index.md` whose front
+  matter sets `build: {render: never, list: never}` and cascades the same to
+  every descendant. Verified: no page rendered, nothing in the sidebar,
+  nothing in the search index.
+- Hextra builds the edit link from the absolute filesystem path for mounted
+  files, producing a broken URL, so edit links are disabled.
 - Hextra selects its sidebar layouts by Hugo `type: docs`. The pages' current
   `type: how-to` style key was this project's own convention, not the
   Diátaxis plugin's (its validator asks for `title`, `summary`,
@@ -42,10 +51,9 @@ site/
   go.mod, go.sum            Hugo module github.com/therealbill/typesafe-go/site;
                             requires github.com/imfing/hextra v0.12.3
   content/_index.md         landing page, layout hextra-home
-  layouts/_markup/render-link.html   only if Hextra's own hook does not
-                            resolve .md links; otherwise absent
 docs/
   _index.md                 "Documentation": the Diátaxis compass
+  superpowers/_index.md     build: render never, list never; cascaded
   tutorials/_index.md       weight 1, cascade type: docs
   how-to/_index.md          weight 2, cascade type: docs
   reference/_index.md       weight 3, cascade type: docs
@@ -70,10 +78,7 @@ enableRobotsTXT = true
   [[module.mounts]]
     source = "../docs"
     target = "content/docs"
-    excludeFiles = ["superpowers/**"]
 
-[markup.goldmark.renderHooks.link]
-  enableDefault = true
 [markup.goldmark.renderer]
   unsafe = true            # Hextra shortcodes emit HTML
 [markup.highlight]
@@ -91,8 +96,7 @@ enableRobotsTXT = true
     enable = true
     type   = "flexsearch"
   [params.editURL]
-    enable = true
-    base   = "https://github.com/therealbill/typesafe-go/edit/main/site/content"
+    enable = false
   [params.footer]
     displayCopyright = false
     displayPoweredBy = false
@@ -114,12 +118,6 @@ enableRobotsTXT = true
     [menu.main.params]
       type = "search"
 ```
-
-The edit link base above points at `site/content`, which is right for the
-landing page but wrong for mounted pages; the plan verifies what Hextra
-renders for mounted files and either sets a base that works for both or
-disables the edit link. Whichever is chosen is recorded in the plan, not left
-open.
 
 `.gitignore` gains:
 
@@ -196,8 +194,8 @@ when extracting links; keep excluding `docs/superpowers/`.
 - Trigger: push to `main` with paths `docs/**`, `site/**`, and
   `.github/workflows/hugo-deploy.yml`; plus `workflow_dispatch`. Because
   `docs/superpowers/**` is under `docs/**`, spec and plan commits also
-  trigger a build; that is accepted (the build excludes those files and the
-  cost is one short run).
+  trigger a build; that is accepted (those pages never render and the cost
+  is one short run).
 - Permissions: `contents: read`, `pages: write`, `id-token: write`.
   Concurrency group `pages`, `cancel-in-progress: false`.
 - Build job: install Hugo extended `0.166.0` from the release `.deb`;
