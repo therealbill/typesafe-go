@@ -1308,7 +1308,7 @@ Expected: PASS, 0 issues, help text shows the scope paragraph. Report "Task 2 do
 - Delete: `tools/selfreview/main.go`, `tools/selfreview/main_test.go`
 - Modify: `Makefile`, `.gitignore`
 
-- [ ] **Step 1: Move the config and add its description**
+- [x] **Step 1: Move the config and add its description**
 
 ```bash
 git mv tools/selfreview/units.json jev-review.json
@@ -1323,7 +1323,7 @@ ls tools/
 ```
 Expected: `tools/` now contains only `checkdocs.sh`.
 
-- [ ] **Step 2: Makefile and .gitignore**
+- [x] **Step 2: Makefile and .gitignore**
 
 Replace the `selfreview` target with:
 
@@ -1333,7 +1333,7 @@ review: build ## Run jev review against this repository (needs TYPESAFE_API_KEY)
 ```
 Update `.PHONY` (replace `selfreview` with `review`) and the `clean` target (replace `selfreview-report.json` with `jev-review-report.json`). In `.gitignore`, replace `selfreview-report.json` with `jev-review-report.json`.
 
-- [ ] **Step 3: Verify, including a live run**
+- [x] **Step 3: Verify, including a live run**
 
 ```bash
 go build ./... && go test ./... 2>&1 | tail -6
@@ -1343,7 +1343,7 @@ make review 2>&1 | tail -15; echo "exit ${PIPESTATUS[0]}"
 ```
 Expected: build and tests pass; `make review` prints the table with the same accepted flags as before (exit 0), or shows drift, which you report rather than accept; the `--json` run prints one unit. Note the report file name in `make review`'s output is `jev-review-report.json`, gitignored.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add jev-review.json tools/selfreview Makefile .gitignore
