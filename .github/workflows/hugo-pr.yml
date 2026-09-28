@@ -1,0 +1,32 @@
+name: Documentation site build check
+
+on:
+  pull_request:
+    paths:
+      - "docs/**"
+      - "site/**"
+      - ".github/workflows/hugo-pr.yml"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      HUGO_VERSION: "0.166.0"
+    steps:
+      - name: Install Hugo
+        run: |
+          wget -O "${{ runner.temp }}/hugo.deb" "https://github.com/gohugoio/hugo/releases/download/v${HUGO_VERSION}/hugo_extended_${HUGO_VERSION}_linux-amd64.deb"
+          sudo dpkg -i "${{ runner.temp }}/hugo.deb"
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build
+        run: hugo --gc --minify -s site --baseURL "https://therealbill.github.io/typesafe-go/"
+      - name: Summary
+        run: |
+          echo "## Documentation site build" >> "$GITHUB_STEP_SUMMARY"
+          echo "Pages: $(find site/public -name index.html | wc -l)" >> "$GITHUB_STEP_SUMMARY"
+          echo "Size: $(du -sh site/public | cut -f1)" >> "$GITHUB_STEP_SUMMARY"
