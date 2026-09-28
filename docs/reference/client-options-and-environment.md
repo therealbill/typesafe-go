@@ -1,7 +1,8 @@
 ---
 title: "Client Options and Environment"
 description: "Client construction, functional options, per-call request options, configuration resolution order, defaults, environment variables, retry policy, and instrumentation hooks in the typesafe package."
-type: reference
+diataxis: reference
+weight: 10
 ---
 
 # Client Options and Environment

@@ -1,7 +1,8 @@
 ---
 title: "How to Trace Calls and Send Them to Honeycomb"
 description: "Attach OpenTelemetry instrumentation to a typesafe.Client or the jev CLI, opt into content recording, and route spans to Honeycomb."
-type: how-to
+diataxis: how-to
+weight: 40
 ---
 
 # How to Trace Calls and Send Them to Honeycomb

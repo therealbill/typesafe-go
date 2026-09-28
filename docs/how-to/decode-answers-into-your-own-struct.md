@@ -1,7 +1,8 @@
 ---
 title: "How to Decode Answers into Your Own Struct"
 description: "Use SystemOneAs to decode SystemOne answers directly into a struct you define, choose between pointer and value answer fields, and handle ResponseValidationError."
-type: how-to
+diataxis: how-to
+weight: 20
 ---
 
 # How to Decode Answers into Your Own Struct

@@ -1,7 +1,8 @@
 ---
 title: "Mapping from the Python SDK"
 description: "How each piece of the Python typesafe-sdk surface maps onto the Go SDK, and why the translations are not always one-to-one."
-type: explanation
+diataxis: explanation
+weight: 40
 ---
 
 # Mapping from the Python SDK

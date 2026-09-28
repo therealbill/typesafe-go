@@ -1,7 +1,8 @@
 ---
 title: "Span Attributes"
 description: "Everything exported from the typesafe/otel package: New, Option, the WithRecordAnswers/WithRecordContent/WithTracerProvider options, TracerName, ProviderName, and every span attribute key constant and its value."
-type: reference
+diataxis: reference
+weight: 60
 ---
 
 # Span Attributes

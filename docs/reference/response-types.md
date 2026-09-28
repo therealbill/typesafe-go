@@ -1,7 +1,8 @@
 ---
 title: "Response Types"
 description: "The Answer interface and its implementations (NoulAnswer, ChoiceAnswer, ScoreAnswer, UnknownAnswer), Usage, RawResponse, SystemOneResponse, ListModelsResponse, ModelMetadata, and SystemOneAs."
-type: reference
+diataxis: reference
+weight: 30
 ---
 
 # Response Types

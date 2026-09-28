@@ -1,7 +1,8 @@
 ---
 title: "jev from the Command Line"
 description: "Build the jev binary and use it to check its version, list models, and send System One requests in both flag and JSON mode, straight from the shell."
-type: tutorial
+diataxis: tutorial
+weight: 20
 ---
 
 # jev from the Command Line

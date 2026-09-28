@@ -1,7 +1,8 @@
 ---
 title: "Retries and Budgets"
 description: "Why gojev's retry policy is shaped the way it is: bounded backoff, a total time budget, and which failures are worth retrying at all."
-type: explanation
+diataxis: explanation
+weight: 20
 ---
 
 # Retries and Budgets

@@ -1,7 +1,8 @@
 ---
 title: "Why the Core Is Stdlib-Only"
 description: "Why the typesafe package imports nothing but the Go standard library, and how the Instrumentation interface lets tracing live outside it."
-type: explanation
+diataxis: explanation
+weight: 10
 ---
 
 # Why the Core Is Stdlib-Only

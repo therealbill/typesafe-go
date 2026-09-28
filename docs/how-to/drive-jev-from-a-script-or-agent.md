@@ -1,7 +1,8 @@
 ---
 title: "How to Drive jev from a Script or Agent"
 description: "The stdin/stdout/exit-code contract a script or autonomous agent relies on when running jev as a subprocess."
-type: how-to
+diataxis: how-to
+weight: 50
 ---
 
 # How to Drive jev from a Script or Agent

@@ -1,7 +1,8 @@
 ---
 title: "Your First Judgment in Go"
 description: "Send a support ticket to the TypeSafe System One API from a Go program and get back a probability, a choice, and a score."
-type: tutorial
+diataxis: tutorial
+weight: 10
 ---
 
 # Your First Judgment in Go

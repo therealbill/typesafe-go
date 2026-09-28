@@ -1,7 +1,8 @@
 ---
 title: "Why Content Is Not Traced by Default"
 description: "Why the typesafe/otel instrumentation records call metadata but never state, questions, or answers unless the caller opts in."
-type: explanation
+diataxis: explanation
+weight: 30
 ---
 
 # Why Content Is Not Traced by Default

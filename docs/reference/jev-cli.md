@@ -1,7 +1,8 @@
 ---
 title: "jev CLI"
 description: "The jev binary: global flags, the ask/models/version subcommands, their input and output JSON shapes, telemetry-related environment variables, and exit codes."
-type: reference
+diataxis: reference
+weight: 50
 ---
 
 # jev CLI

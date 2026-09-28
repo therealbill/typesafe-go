@@ -1,7 +1,8 @@
 ---
 title: "Errors and Exit Codes"
 description: "The typesafe package's error types and predicate functions (APIError, RateLimitError, ConnectionError, TimeoutError, ResponseValidationError, ValidationError, ErrMissingAPIKey, IsAuthError, IsRateLimited, IsRetryable), and the jev CLI's exit code table and error JSON shape."
-type: reference
+diataxis: reference
+weight: 40
 ---
 
 # Errors and Exit Codes

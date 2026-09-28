@@ -1,7 +1,8 @@
 ---
 title: "Question Types"
 description: "The Question interface and its implementations (Noul, Choice, Score, RawQuestion), JSONContent, and the wire JSON each question type produces."
-type: reference
+diataxis: reference
+weight: 20
 ---
 
 # Question Types

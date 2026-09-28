@@ -1,7 +1,8 @@
 ---
 title: "How to Handle Rate Limits and Retries"
 description: "Customize the SDK's retry policy client-wide or per call, detect rate limits with RateLimitError, and decide when your own code should retry a whole batch."
-type: how-to
+diataxis: how-to
+weight: 10
 ---
 
 # How to Handle Rate Limits and Retries

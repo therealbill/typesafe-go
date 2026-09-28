@@ -1,7 +1,8 @@
 ---
 title: "How to Call Through a Gateway"
 description: "Point the client at a gateway or proxy instead of the default TypeSafe endpoint, add gateway authentication headers, route through a custom HTTP transport, and pass gateway-specific request fields."
-type: how-to
+diataxis: how-to
+weight: 30
 ---
 
 # How to Call Through a Gateway
