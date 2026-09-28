@@ -1411,7 +1411,7 @@ git commit -m "Rewrite the review documentation for any codebase"
 **Files:**
 - Modify: `docs/reference/jev-cli.md`, `docs/reference/errors-and-exit-codes.md`, `docs/reference/makefile-and-repository-layout.md`, `docs/how-to/cut-a-release.md`, `docs/explanation/the-agent-facing-cli-contract.md`, `README.md`, `docs/superpowers/specs/2026-09-23-typesafe-go-sdk-design.md`, and any page `checkdocs.sh` flagged in Task 4
 
-- [ ] **Step 1: Update each page from source**
+- [x] **Step 1: Update each page from source**
 
 - `jev-cli.md`: add the `review` and `review init` subcommands (flag tables from `--help`), exit code 8 in the table.
 - `errors-and-exit-codes.md`: exit 8, kind `flagged`, and the rule that a unit's API failure uses the classifier's code while a failing unit without one exits 8.
@@ -1422,7 +1422,7 @@ git commit -m "Rewrite the review documentation for any codebase"
 - `docs/superpowers/specs/2026-09-23-typesafe-go-sdk-design.md`: one line under the Self-review section pointing to `2026-09-28-jev-review-design.md`.
 - Fix every link `checkdocs.sh` flagged.
 
-- [ ] **Step 2: Validate and commit**
+- [x] **Step 2: Validate and commit**
 
 Run `diataxis-docs:doc-crosslink-validator` over `docs/` and `README.md` with the same front-matter note as before (this project uses `title`, `description`, `diataxis`, `weight`, and now `aliases`). Fix what it reports. Then:
 
