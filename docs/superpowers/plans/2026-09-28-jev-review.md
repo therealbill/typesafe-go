@@ -66,7 +66,7 @@ Tasks 3 and 5 → Task 6
 
 The logic is `tools/selfreview/main.go` restructured: exported types, `Load` with validation and path resolution, `Run` over an `Asker`, typed answers instead of `map[string]any`, and no `os.Exit`, `flag`, `exec`, or environment reads. Do not delete `tools/selfreview` in this task; Task 3 does.
 
-- [ ] **Step 1: Write the failing tests `internal/review/review_test.go`**
+- [x] **Step 1: Write the failing tests `internal/review/review_test.go`**
 
 ```go
 package review
@@ -416,14 +416,14 @@ func TestTemplateLoads(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 ```bash
 go test ./internal/review/ 2>&1 | head -3
 ```
 Expected: package does not exist or undefined symbols.
 
-- [ ] **Step 3: Write `internal/review/review.go`**
+- [x] **Step 3: Write `internal/review/review.go`**
 
 ```go
 // Package review asks Jev whether a codebase's tests exercise the behaviors
@@ -922,7 +922,7 @@ func (r Report) Markdown(opts Options) string {
 
 Note the `weakest_area` label descriptions are reworded to be codebase-neutral (the old ones named this SDK's own types). The labels themselves are unchanged, so existing acceptances still match.
 
-- [ ] **Step 4: Write `internal/review/template.go`**
+- [x] **Step 4: Write `internal/review/template.go`**
 
 ```go
 package review
@@ -951,7 +951,7 @@ func Template() []byte {
 }
 ```
 
-- [ ] **Step 5: Run tests, lint, commit**
+- [x] **Step 5: Run tests, lint, commit**
 
 ```bash
 go test -race -v ./internal/review/ 2>&1 | tail -20
