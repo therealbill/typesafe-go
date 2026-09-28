@@ -16,3 +16,6 @@ without advice; when a page tells you how to choose, it belongs in the
 - [Errors and exit codes](errors-and-exit-codes.md)
 - [jev CLI](jev-cli.md)
 - [Span attributes](span-attributes.md)
+- [jev ask wire format](jev-ask-wire-format.md)
+- [Self-review tool](self-review-tool.md)
+- [Makefile and repository layout](makefile-and-repository-layout.md)
