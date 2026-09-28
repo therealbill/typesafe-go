@@ -23,11 +23,10 @@ A command-line Go program that:
 4. Decodes the same answers into your own Go struct instead of maps.
 5. Handles a failed request the way real code should, using `errors.As`.
 
-Every command below is one you actually run. The checkpoints show real output
+Every command below is a command you run. The checkpoints show output
 captured from the live API. TypeSafe's judgments come from a model, not a
-lookup table. If you run these programs yourself, expect your probabilities,
-confidence values, and scores to land close to what's shown here, though they
-will rarely match to the decimal.
+lookup table, so your probabilities, confidence values, and scores will land
+close to the values shown here and will rarely match them to the decimal.
 
 ## Prerequisites
 
@@ -62,8 +61,7 @@ export TYPESAFE_API_KEY=<your API key>
 
 Open `go.mod`. You should see a `require` line for
 `github.com/therealbill/typesafe-go`, and a `go.sum` file should now exist
-alongside it. That's everything the library needs. It has no third-party
-dependencies of its own.
+alongside it. The library has no third-party dependencies of its own.
 
 ## Step 2: Ask three questions about a ticket
 
@@ -167,13 +165,13 @@ top.
 
 ## Step 3: See the raw JSON
 
-The typed accessors you just used (`Nouls()`, `Choices()`, `Scores()`) are
+The typed accessors from Step 2 (`Nouls()`, `Choices()`, `Scores()`) are
 built from the response's underlying JSON. Every `*SystemOneResponse`
 keeps the original bytes on `Raw.Body`, so you can look at exactly what the
 API sent back.
 
 Replace the body of `main.go` with a version that pretty-prints that raw body
-instead of the friendly summary:
+instead of the three-line summary:
 
 ```go
 package main
@@ -292,17 +290,20 @@ probabilities and scores):
 }
 ```
 
-> **What happened**
+> **Reading this response**
 >
-> This was a separate call from Step 2's, which is why `urgency.score` reads
-> 1.92 here instead of 1.89. Each call is an independent model judgment. The
-> response also shows `"model": "jev-1.13.0"`, a concrete, versioned model
-> name, even though nothing in the program asked for one. That's the
-> library's default (`jev-latest`) resolved by the server to whichever
-> version currently backs it. Every answer type carries its own `"type"`
-> field (`noul`, `choice`, `score`), which is how the library knows which Go
-> type to decode each answer into. The full shape of this response (every
-> field, and how each answer type decodes) is documented on the
+> This was a separate call from Step 2's, so `urgency.score` reads 1.92 here
+> instead of 1.89. Each call is an independent model judgment.
+>
+> The response names a concrete, versioned model in `"model": "jev-1.13.0"`,
+> even though nothing in the program asked for one. The library's default is
+> `jev-latest`, which the server resolves to whichever version currently
+> backs it.
+>
+> Every answer carries its own `"type"` field (`noul`, `choice`, `score`),
+> which is how the library knows which Go type to decode that answer into.
+> The full shape of this response (every field, and how each answer type
+> decodes) is documented on the
 > [response types reference](../reference/response-types.md).
 
 ## Step 4: Decode into your own struct
@@ -408,13 +409,11 @@ questions and multiple question sets), see
 
 ## Step 5: Handle a failed request
 
-Every real integration eventually calls the API with something wrong: an
-expired key, a bad request, a rate limit. When that happens, `SystemOne` and
-`SystemOneAs` return a `*typesafe.APIError` you can recognize with
-`errors.As` and inspect for a status code and a human-readable message.
+`SystemOne` and `SystemOneAs` return a `*typesafe.APIError` when a request
+fails: an expired key, a bad request, a rate limit. `errors.As` recognizes
+that type, and the error carries a status code and a human-readable message.
 
-You can see this for real, on purpose, by building a client with a key the
-server will reject:
+Build a client with a key the server will reject to see one:
 
 ```go
 package main
@@ -480,10 +479,10 @@ func main() {
 ```
 
 `typesafe.WithAPIKey("wrong-key")` overrides the environment variable for
-just this client, so your real `TYPESAFE_API_KEY` is untouched and unused
-here. This client can't authenticate. `errors.As` finds the
-`*typesafe.APIError` even if it were wrapped inside another error, which is
-the pattern to reach for in your own code any time a `SystemOne` call fails.
+this client only, so your real `TYPESAFE_API_KEY` is untouched and unused
+here, and this client cannot authenticate. `errors.As` finds the
+`*typesafe.APIError` even when it is wrapped inside another error, so use it
+in your own code any time a `SystemOne` call fails.
 
 Run it:
 

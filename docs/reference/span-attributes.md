@@ -10,13 +10,15 @@ weight: 60
 Package: `github.com/therealbill/typesafe-go/otel` (import path `otel`).
 
 Package otel instruments a `typesafe.Client` with OpenTelemetry traces.
-Attach it with `typesafe.WithInstrumentation(otel.New())`. Each `SystemOne`
-or `ListModels` call becomes a client span named `typesafe.system_one` or
-`typesafe.list_models`, with one child HTTP span per attempt. State and
-question content are never recorded unless `WithRecordContent` is set.
+`typesafe.WithInstrumentation(otel.New())` attaches it to a client. Each
+`SystemOne` or `ListModels` call becomes a client span named
+`typesafe.system_one` or `typesafe.list_models`, with one child HTTP span per
+attempt. State and question content are never recorded unless
+`WithRecordContent` is set.
 
-This package never installs a global tracer provider. Set one in your
-application before building the client, or pass `WithTracerProvider`.
+This package never installs a global tracer provider. It uses the global
+provider already set in the process, or the one given to
+`WithTracerProvider`.
 
 ## TracerName
 
@@ -157,12 +159,10 @@ added at span end, in ascending key order:
 are not `Attr*` constants; they are built as the literal prefix
 `"typesafe.answer."` plus the question identifier plus a field suffix.
 
-A `ChoiceAnswer`'s `Choice` value is truncated with `truncateRuneSafe` (the
-same rune-safe helper used for `AttrState`/`AttrQuestions`) to at most
+A `ChoiceAnswer`'s `Choice` value is truncated to at most
 `maxAnswerChoiceBytes` (`= 256`) bytes before being set as the
-`typesafe.answer.<key>.choice` attribute, bounding how much a pathologically
-long label can bloat a span. Unlike `AttrState`/`AttrQuestions`, this cut
-does not append the `...(truncated)` marker. The value is cut cleanly with
-no suffix, since it is a discrete label field rather than JSON content.
-`Noul` and `Score` values are numeric and are not truncated; only the
-`.choice` string attribute is capped.
+`typesafe.answer.<key>.choice` attribute, using `truncateRuneSafe`, the same
+rune-safe helper used for `AttrState`/`AttrQuestions`. This cut appends no
+`...(truncated)` marker, unlike `AttrState`/`AttrQuestions`. `Noul` and
+`Score` values are numeric and are not truncated; only the `.choice` string
+attribute is capped.

@@ -159,12 +159,12 @@ HONEYCOMB_API_KEY=your-key ./bin/jev ask --trace \
 ✅ Success looks like the normal answer JSON on stdout, and, shortly after,
 a trace in Honeycomb showing `typesafe.system_one` with a child HTTP span.
 
-## Two things to know before you rely on this
+## Export failures and binary size
 
 **A misconfigured exporter never fails the command.** Run `jev ask --trace`
 with no `HONEYCOMB_API_KEY` and no collector listening. The command still
 succeeds; exit code and stdout are independent of whether the best-effort
-trace export succeeds. Captured on this machine, right now:
+trace export succeeds. A real run:
 
 ```
 $ ./bin/jev ask --trace --state "..." --noul billing="Is this about billing?"
@@ -173,20 +173,20 @@ $ ./bin/jev ask --trace --state "..." --noul billing="Is this about billing?"
 ```
 
 Exit code 0. That stderr line comes from the OTel SDK's own default error
-handler, not a `jev:`-prefixed message. A tracing misconfiguration must
-never turn a working `ask`/`models` call into a failure.
+handler, not a `jev:`-prefixed message.
 
 **`jev` is a much heavier binary than the core library.** See
 [Why the Core Is Stdlib-Only](../explanation/why-the-core-is-stdlib-only.md)
 for why the core has zero dependencies while `jev` carries the OpenTelemetry
-stack, and how to get tracing without paying for it in your own binary.
+stack, and how to trace calls without adding those dependencies to your own
+binary.
 
 ## Troubleshooting
 
 ### Problem: no spans arrive in Honeycomb, but the command succeeds
 **Symptom**: exit code 0, normal JSON output, nothing shows up in Honeycomb.
-**Cause**: export failed silently to your terminal's normal flow. Check
-stderr for the `traces export: failed to send to ...` line described above.
+**Cause**: the export failed and reported it only on stderr. Check stderr
+for the `traces export: failed to send to ...` line described above.
 **Solution**: fix the underlying cause (usually a missing/wrong
 `HONEYCOMB_API_KEY`), then re-run.
 
@@ -202,8 +202,9 @@ works, independent of environment detection.
 **Cause**: `OTEL_CONFIG_FILE` failed to read or parse, or SDK construction
 itself failed. This happens before any request, not during export.
 **Solution**: validate the YAML with `otelconf.ParseYAML` semantics in mind
-(the schema shown in Step 5), and confirm the path is readable. Safe to
-paste into a bug report. Any `${VAR}`-expanded secret is already redacted.
+(the schema shown in Step 5), and confirm the path is readable. The message
+is safe to paste into a bug report, since any `${VAR}`-expanded secret is
+already redacted.
 
 ### Problem: state/questions never appear on the span
 **Symptom**: everything else on the span is populated, but no

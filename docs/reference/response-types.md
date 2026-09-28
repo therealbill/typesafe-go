@@ -241,6 +241,6 @@ type Triage struct {
 }
 ```
 
-The full response is returned alongside so usage and request ID are not
-lost. On a request error the response is nil. On a decode error the response
-is returned with the error.
+The full response is returned alongside `T`, carrying the usage and request
+ID. On a request error the response is nil. On a decode error the response is
+returned with the error.

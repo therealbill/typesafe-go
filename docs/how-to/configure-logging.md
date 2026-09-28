@@ -138,8 +138,8 @@ logger discards everything.
 
 ### Problem: a 4xx failure only shows up at warn, not error
 **Symptom**: `--log-level error` shows nothing for a 400/401/422 failure.
-**Cause**: this is intentional. The code comment in `transport.go` treats a
-4xx as the caller's mistake, not an incident worth error-level severity.
+**Cause**: `transport.go` treats a 4xx as the caller's mistake rather than
+an incident, and logs it at warn.
 **Solution**: use `--log-level warning` (or lower) to see 4xx failures, and
 reserve `error` for what needs paging: 5xx responses and
 connection failures.

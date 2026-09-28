@@ -17,9 +17,8 @@ type Client struct {
 }
 ```
 
-Client calls the TypeSafe API and is safe for concurrent use. The zero value
-is not usable; build one with `NewClient` and share it across goroutines
-instead of constructing one per call or per request.
+Client calls the TypeSafe API. A single Client is safe for concurrent use by
+multiple goroutines. The zero value is not usable; `NewClient` builds one.
 
 ### NewClient
 
@@ -64,8 +63,9 @@ is documented on the response types reference.
 func (c *Client) String() string
 ```
 
-String describes the client without its API key, so the key cannot reach a
-log through `fmt`. Returns `typesafe.Client{base_url: <url>, model: <model>}`.
+String renders the client for `fmt` verbs. It returns
+`typesafe.Client{base_url: <url>, model: <model>}` and never includes the API
+key.
 
 ### (\*Client) LogValue
 
@@ -73,10 +73,9 @@ log through `fmt`. Returns `typesafe.Client{base_url: <url>, model: <model>}`.
 func (c *Client) LogValue() slog.Value
 ```
 
-LogValue describes the client without its API key, so the key cannot reach a
-log through `slog`. Returns `slog.GroupValue(slog.String("base_url", ...),
-slog.String("model", ...))`, only those two string attributes, never the API
-key.
+LogValue renders the client for `slog`. It returns
+`slog.GroupValue(slog.String("base_url", ...), slog.String("model", ...))`,
+only those two string attributes, never the API key.
 
 ## Configuration resolution order
 
@@ -207,8 +206,9 @@ type RetryPolicy struct {
 }
 ```
 
-RetryPolicy controls how failed requests are retried. Start from
-`DefaultRetryPolicy` and change fields; a zero RetryPolicy disables retries.
+RetryPolicy controls how failed requests are retried. `DefaultRetryPolicy`
+returns a populated policy whose fields can then be changed. A zero
+RetryPolicy disables retries.
 
 | Field | Type | Description | Default (`DefaultRetryPolicy`) |
 |---|---|---|---|

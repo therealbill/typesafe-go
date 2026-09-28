@@ -31,9 +31,8 @@ git push origin v1.2.0
 ```
 
 **Do not run these two commands as a rehearsal.** Pushing a real `v*` tag
-starts the actual release pipeline and publishes a GitHub release. Everything
-past this point describes what that push does; treat it as reference, not a
-next step to try right now.
+starts the release pipeline and publishes a GitHub release. The steps below
+describe what that push does; read them as reference.
 
 ### 2. Know what the tag push kicks off
 
@@ -126,8 +125,7 @@ make sure your local clone isn't shallow.
 tagged at build time, or ldflags weren't applied to that build.
 **Solution**: rebuild from a real `v*` tag through the release workflow, or
 locally with `git describe --tags` returning a real tag name. A local
-`make build` on an untagged commit always falls back to the short hash, by
-design.
+`make build` on an untagged commit always falls back to the short hash.
 
 ## Next steps
 

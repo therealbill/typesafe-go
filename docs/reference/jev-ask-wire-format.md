@@ -7,9 +7,9 @@ weight: 70
 
 # jev ask Wire Format
 
-This page documents the JSON document shapes for `jev ask` precisely: the
-request document it parses, the response document it prints, and the error
-envelope it prints on failure. Flags, input modes, and subcommand-level
+This page documents the JSON document shapes for `jev ask`: the request
+document it parses, the response document it prints, and the error envelope
+it prints on failure. Flags, input modes, and subcommand-level
 behavior are documented on the [jev CLI reference](jev-cli.md). Source:
 `internal/cli/request.go` (`parseRequestJSON`, `parseQuestion`), `question.go`
 (`Noul`, `Choice`, `Score`, their `MarshalJSON` methods), `response.go`
@@ -193,10 +193,9 @@ type Usage struct {
 }
 ```
 
-`Usage.InputTokens` and `Usage.OutputTokens` are pointers so a field the
-server omits decodes as Go `nil` (JSON `null`) rather than the ambiguous
-value `0`. `request_id` is omitted entirely from the marshaled response when
-empty.
+`Usage.InputTokens` and `Usage.OutputTokens` are pointers, so a field the
+server omits decodes as Go `nil` (JSON `null`) rather than as `0`.
+`request_id` is omitted entirely from the marshaled response when empty.
 
 Each entry in `answers` is decoded by `decodeAnswer` according to its own
 `"type"` field:

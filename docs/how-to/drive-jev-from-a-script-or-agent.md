@@ -110,14 +110,13 @@ Full classification order and edge cases:
 
 Without `--raw`, `jev` re-encodes the parsed response (Step 2), honoring
 `--pretty`. With `--raw`, it writes the server's response bytes unchanged
-plus a trailing newline, for when a script wants the API's response
-passed through untouched, byte for byte.
+plus a trailing newline, for when a script wants the API's response passed
+through untouched.
 
 ### 6. Skip `--pretty` when piping to `jq`
 
 `--pretty` indents JSON for a human reading it directly. A script parsing
-with `jq` or any JSON library doesn't need it. Compact JSON is simpler to
-pipe.
+with `jq` or any JSON library doesn't need it.
 
 ## Verify it works
 
@@ -172,8 +171,8 @@ $ ./bin/jev ask --state "I was charged twice this month and nobody answers my em
 angry
 ```
 
-✅ Success! The subprocess contract (JSON in, JSON out, a meaningful exit
-code) holds for both the happy path and a real failure.
+✅ The subprocess contract (JSON in, JSON out, a meaningful exit code)
+holds for both the success path and a real failure.
 
 ## Troubleshooting
 

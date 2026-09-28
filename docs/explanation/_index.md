@@ -6,9 +6,9 @@ cascade:
   type: docs
 ---
 
-Explanation pages step back from the code to discuss design choices, trade-offs,
-and mental models. Nothing here is a step to follow; read them when a
-[how-to guide](../how-to/_index.md) leaves you wondering why.
+These pages cover design decisions, trade-offs, and the models behind the
+library's behavior. None of them is a procedure to follow. Read one when a
+[how-to guide](../how-to/_index.md) says what to do but not why.
 
 - [Why the core is stdlib-only](why-the-core-is-stdlib-only.md)
 - [Retries and budgets](retries-and-budgets.md)

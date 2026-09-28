@@ -28,8 +28,8 @@ By the end, you will have:
 - Read a successful exit code and a failed one, and seen the JSON shape
   `jev` prints for each.
 
-Every command below is one you actually run against the real API. TypeSafe's
-judgments come from a model, not a lookup table. The exact probabilities,
+Every command below is a command you run against the live API. TypeSafe's
+judgments come from a model, not a lookup table, so the probabilities,
 confidence values, and scores you see will differ slightly from the ones
 shown here, and will differ again between two runs of the same command.
 
@@ -51,8 +51,8 @@ make build
 ```
 
 This compiles `./cmd/jev` and writes the binary to `./bin/jev`. `make`
-echoes the build command it runs, but the underlying `go build` itself
-produces no output when it succeeds. No output is a good sign.
+echoes the build command it runs; the `go build` underneath produces no
+output when it succeeds.
 
 ### Checkpoint
 
@@ -119,9 +119,9 @@ Run:
 ```
 
 `--pretty` indents the JSON; without it, `jev` prints the same data on one
-line. This was your first real call to the API. `request_id` is the
-server's identifier for it, useful if you ever need to reference a specific
-call when troubleshooting.
+line. `jev models` is the first command in this tutorial that calls the API.
+`request_id` is the server's identifier for that call, which you can
+reference when troubleshooting a specific request.
 
 ### Checkpoint
 
@@ -258,9 +258,8 @@ own exit code.
 
 ## Step 7: Provoke an auth error
 
-Now see what a failure looks like. Run the same command as Step 4, but add
-`--api-key bad` to override your real key with an invalid one for this one
-call:
+Run the same command as Step 4 with `--api-key bad` added, which overrides
+your real key with an invalid one for this one call:
 
 ```bash
 ./bin/jev ask --state "I was charged twice this month and nobody answers my emails. Fix it now." \

@@ -7,8 +7,8 @@ cascade:
 ---
 
 Reference pages describe what exists. They state facts, defaults, and shapes
-without advice; when a page tells you how to choose, it belongs in the
-[how-to guides](../how-to/_index.md) instead.
+without advice. Guidance on choosing between options lives in the
+[how-to guides](../how-to/_index.md).
 
 - [Client options and environment](client-options-and-environment.md)
 - [Question types](question-types.md)

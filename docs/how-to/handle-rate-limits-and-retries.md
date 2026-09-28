@@ -67,8 +67,7 @@ is `func(*requestConfig) error`, so a malformed value (a negative duration
 passed to `WithRequestTimeout`, for example) returns a
 `*typesafe.ValidationError` immediately, before any network call. It surfaces
 through the same `err` returned from `SystemOne`/`SystemOneAs` above, so no
-special error-handling pattern is needed. Don't assume only server
-responses can produce an error here.
+special error-handling pattern is needed.
 
 ### 3. Detect a rate limit and read `RetryAfter`
 
@@ -86,11 +85,10 @@ if errors.As(err, &rateLimitErr) {
 
 Separately, `RetryPolicy.MaxRetryAfter` (default 5 minutes, backfilled to
 that default automatically even in a hand-built policy) caps how long the
-SDK's *own* automatic retry loop waits when `HonorRetryAfter` is
-true and the server asks for longer. `HonorRetryAfter` means "wait what the
-server says, up to `MaxRetryAfter`," not "wait however long the server
-says." This clamp never touches `RateLimitError.RetryAfter`
-itself, only the SDK's internal sleep.
+SDK's *own* automatic retry loop waits when `HonorRetryAfter` is true. With
+`HonorRetryAfter` set, the SDK sleeps for the server's requested wait or for
+`MaxRetryAfter`, whichever is shorter. The clamp never touches
+`RateLimitError.RetryAfter` itself, only the SDK's internal sleep.
 
 To see this without a live rate limit, disable the SDK's own retries
 (`MaxRetries: 0`) so the 429 surfaces immediately instead of being retried
@@ -120,10 +118,9 @@ if errors.As(err, &rateLimitErr) {
 ### 4. Let a caller-owned retry loop use `IsRetryable`
 
 `IsRetryable(err)` reports whether `DefaultRetryPolicy` would retry that
-error, independent of whatever policy the client is configured
-with. Reach for it when you're retrying something bigger than one call, such
-as a whole batch, and want to give up immediately on errors that will never
-succeed no matter how many times you try:
+error, independent of whatever policy the client is configured with. Use it
+when your own code retries something larger than a single call, such as a
+whole batch, and should stop on errors that a retry cannot fix:
 
 ```go
 func runBatch(ctx context.Context, client *typesafe.Client) error {

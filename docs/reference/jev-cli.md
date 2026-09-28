@@ -46,9 +46,8 @@ Use "jev [command] --help" for more information about a command.
 ### `-v`, `--version` (global flag) versus `jev version` (subcommand)
 
 The root command declares `Version: version.Version`, which makes Cobra
-auto-provide a `-v`/`--version` flag on `jev` itself. This flag and the `jev
-version` subcommand are different things that happen to share the word
-"version":
+auto-provide a `-v`/`--version` flag on `jev` itself. That flag differs from
+the `jev version` subcommand:
 
 | | `jev --version` / `jev -v` | `jev version` |
 |---|---|---|
@@ -91,16 +90,16 @@ The flag's Cobra default is `2` (`pf.IntVar(&g.maxRetries, "max-retries", 2, "re
 - Not passed: `clientOptions` does not call `typesafe.WithRetryPolicy` at all. The client's own configured policy (or `typesafe.DefaultRetryPolicy()`) applies as-is.
 - Passed (including `--max-retries 2`, matching the default): `clientOptions` calls `p := typesafe.DefaultRetryPolicy(); p.MaxRetries = g.maxRetries; typesafe.WithRetryPolicy(p)`. Every other `RetryPolicy` field still comes from `DefaultRetryPolicy()`.
 
-`--max-retries 2` and omitting the flag are practically indistinguishable in
-effect (both end up at `MaxRetries: 2` with default everything else), but
-mechanically the first explicitly calls `WithRetryPolicy` and the second does
-not call it at all. `--max-retries 0` disables retries.
+`--max-retries 2` and omitting the flag both end at `MaxRetries: 2` with
+every other `RetryPolicy` field at its default; the difference is that the
+first calls `WithRetryPolicy` and the second does not call it at all.
+`--max-retries 0` disables retries.
 
 ### `--timeout`
 
-The flag's Go zero value is still `0`, but `0` is now a meaningful, explicit
-value the flag can carry. Whether `--timeout` was explicitly passed is
-tracked via `cmd.Flags().Changed("timeout")`:
+The flag's Go zero value is `0`, which is also a meaningful value the flag
+can carry explicitly. Whether `--timeout` was explicitly passed is tracked
+via `cmd.Flags().Changed("timeout")`:
 
 - Not passed: `clientOptions` does not call `typesafe.WithTimeout` at all. `typesafe.DefaultTimeout` (`10 * time.Second`) applies at the library level, untouched.
 - Passed, at any value including `0`: `clientOptions` calls `typesafe.WithTimeout(g.timeout)` regardless of the value. `--timeout 0` explicitly disables the per-attempt timeout at the library level.
@@ -405,7 +404,7 @@ A telemetry setup failure (reading or parsing `OTEL_CONFIG_FILE`, or SDK constru
 jev: tracing disabled: <error>
 ```
 
-and the command proceeds with tracing disabled (`typesafe.Instrumentation` is `nil` for that run); it never stops the command from otherwise succeeding. When `OTEL_CONFIG_FILE` fails to parse after `${VAR}` expansion, every expanded environment value of 4 or more bytes is redacted out of `<error>` as `[redacted]`, so a secret substituted into the file cannot leak into this message. A shutdown failure (during the deferred SDK shutdown) is separately reported as:
+and the command proceeds with tracing disabled (`typesafe.Instrumentation` is `nil` for that run). When `OTEL_CONFIG_FILE` fails to parse after `${VAR}` expansion, every expanded environment value of 4 or more bytes is redacted out of `<error>` as `[redacted]`, so a secret substituted into the file does not appear in this message. A shutdown failure (during the deferred SDK shutdown) is separately reported as:
 
 ```
 jev: tracing shutdown: <error>

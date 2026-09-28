@@ -65,7 +65,7 @@ Returns `"typesafe: <Endpoint> returned <Status>"`, with `": <Message()>"` appen
 func (e *APIError) Message() string
 ```
 
-Message extracts a human-readable message from the body. It understands the API's `"detail"` envelope in its string, object, and array forms, falls back to `"message"` or `"error"` fields, and otherwise returns the trimmed body. Every one of those code paths converges on a single return that first coerces the body to valid UTF-8 (`strings.ToValidUTF8(msg, "�")`, replacing invalid byte sequences with `�`) and then truncates the result to 200 bytes (`maxMessageLen`) without splitting a multi-byte UTF-8 rune. `truncate` walks back to the nearest rune boundary before cutting, appending `"..."` when a cut was made.
+Message extracts a human-readable message from the body. It reads the API's `"detail"` envelope in its string, object, and array forms, falls back to the `"message"` or `"error"` fields, and otherwise returns the trimmed body. Every one of those paths returns through the same final step, which coerces the message to valid UTF-8 (`strings.ToValidUTF8(msg, "�")`, replacing invalid byte sequences with `�`) and then truncates it to 200 bytes (`maxMessageLen`) without splitting a multi-byte UTF-8 rune. `truncate` walks back to the nearest rune boundary before cutting, appending `"..."` when a cut was made.
 
 ### RateLimitError
 
@@ -217,24 +217,24 @@ same type whatever the cause, carrying whichever error that context holds.
 - A SIGINT-cancelled context (`Main` installs a `signal.NotifyContext` on `os.Interrupt` and `syscall.SIGTERM`) yields `context.Canceled`, which the order-1 `errors.Is(err, context.Canceled)` check catches → `"interrupted"` (130).
 - A parent context that instead hit its own deadline yields `context.DeadlineExceeded`, which is not `context.Canceled`, so it falls through to the order-8 `*typesafe.ConnectionError` check → `"connection"` (7).
 
-A library caller wanting the same distinction must make the
-`errors.Is(err, context.Canceled)` check itself: `errors.As` against
-`*typesafe.ConnectionError` alone cannot tell the two apart. (A
-`*typesafe.TimeoutError` is unrelated to both: it is produced only by the
-per-attempt timeout from `WithTimeout`/`WithRequestTimeout`, never by the
-caller's own context.)
+At the library level the same distinction comes from
+`errors.Is(err, context.Canceled)`. `errors.As` against
+`*typesafe.ConnectionError` alone does not separate the two cases. A
+`*typesafe.TimeoutError` is a third, unrelated case: it is produced only by
+the per-attempt timeout from `WithTimeout`/`WithRequestTimeout`, never by the
+caller's own context.
 
 ### Usage errors versus validation errors
 
-Input the CLI itself rejects before ever calling the library: malformed
+The CLI rejects four kinds of input before calling the library: malformed
 top-level request JSON (missing `"questions"`, missing `"state"`), a blank or
 whitespace-only flag-mode question key, an unknown field inside a JSON
-question object, or `--state` given without any `--noul`/`--choice`/`--score`.
-All of these surface as `*usageError` (exit code 1, kind `"usage"`). This is distinct
-from `*typesafe.ValidationError` (exit code 2, kind `"validation"`), which is
-the library's own semantic validation of an already-well-formed `Questions`
-map (for example a `Choice` with zero labels) performed after the CLI has
-successfully parsed the request.
+question object, and `--state` given without any `--noul`/`--choice`/`--score`.
+Each surfaces as `*usageError` (exit code 1, kind `"usage"`).
+`*typesafe.ValidationError` (exit code 2, kind `"validation"`) is a separate
+case: the library's own semantic validation of an already-well-formed
+`Questions` map (for example a `Choice` with zero labels), performed after
+the CLI has parsed the request.
 
 Verified against the built binary:
 
@@ -312,7 +312,6 @@ $ echo $?
   Run 'jev --help' for usage.
   ```
 
-This makes the stdout JSON envelope unconditional: it is written on every
-non-zero exit, including a Cobra-level flag or command error rejected before
-any subcommand runs, so a caller parsing stdout never has to special-case
-invocation mistakes. It returns exit code 1 (`ExitUsage`).
+The stdout JSON envelope is therefore written on every non-zero exit,
+including a Cobra-level flag or command error rejected before any subcommand
+runs. This path returns exit code 1 (`ExitUsage`).

@@ -111,26 +111,25 @@ outright).
 ### 5. Watch for the stale-acceptance line
 
 `unitReport.StaleAcceptances`, printed as `"acceptance did not fire: ..."`,
-names an acceptance whose flag didn't trigger on this run. It's
-not a failure, but it's a prompt: either the behavior it was guarding is
-reliably fine now and the acceptance can be deleted, or, as in the real
-example above, it's still measurement noise that happens not to have
-crossed the threshold *this* run, in which case leaving the acceptance in
-place (with its note) is the right call. Either way, an acceptance that sits
-stale run after run without anyone looking at it is worth revisiting.
+names an acceptance whose flag didn't trigger on this run. A stale
+acceptance doesn't fail the run. Check what it guards: if that behavior is
+reliably fine now, delete the acceptance; if the flag is measurement noise
+that stayed under the threshold on this run, as in the example above, keep
+the acceptance and its note. Review any acceptance that stays stale across
+several runs.
 
-### 6. Remember the drift caveat: the note is itself a model judgment
+### 6. Account for run-to-run drift in the flagged numbers
 
 `contradicts_spec` and `thoroughness` are themselves Jev's own probability
 and score answers, so they carry the same run-to-run drift as any other
 `Noul`/`Score` answer, see
 [Act on probabilities and confidence](./act-on-probabilities-and-confidence.md).
-This repo's own recorded note for `questions`' `contradicts_spec`
-acceptance says exactly that: *"0.44–0.49 across three runs with unrelated
-input changes; no spec/code conflict found on review"*. The number moves
-between runs even when nothing relevant changed, because it's a judgment,
-not a deterministic check. Don't read a single run's flag as more precise
-than the drift band your own notes have already measured.
+This repo's recorded note for `questions`' `contradicts_spec` acceptance
+records that drift: *"0.44–0.49 across three runs with unrelated input
+changes; no spec/code conflict found on review"*. The number moves between
+runs with no relevant change, because it is a judgment rather than a
+deterministic check. Don't read a single run's flag as more precise than
+the drift band your own notes have already measured.
 
 ## Verify it works
 

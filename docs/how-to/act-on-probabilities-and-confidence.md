@@ -46,19 +46,18 @@ default:
 
 Against a real ticket ("My invoice for last month shows a charge I don't
 recognize, and I'm getting really frustrated...") `is_billing` came back
-`0.99`, confidently billing. Against an intentionally ambiguous ticket that
-mentioned both a payment and a login problem, the same question came back
-`0.47`, inside the undecided band. The ticket doesn't lean either way.
+`0.99`. Against an intentionally ambiguous ticket that mentioned both a
+payment and a login problem, the same question came back `0.47`, inside the
+undecided band.
 
 ### 2. Pick the threshold against your own data, not a universal number
 
-There's no single "right" cutoff for `billingThreshold` above. A routing
-decision that's cheap to get wrong (route to a queue a human can
-re-triage) can use a looser threshold than one that's expensive to get wrong
-(auto-refund a charge). Run representative states through the question, look
-at the distribution of scores you get back, and set the threshold, and the
-width of the "undecided" band, from that, not from a number that felt right
-in the abstract.
+No single cutoff fits every use of `billingThreshold`. A routing decision
+that is cheap to get wrong (route to a queue a human can re-triage) can use
+a looser threshold than one that is expensive to get wrong (auto-refund a
+charge). Run representative states through the question, look at the
+distribution of scores that come back, and set both the threshold and the
+width of the undecided band from that distribution.
 
 ### 3. Use `ChoiceAnswer.Confidence` to decide how much to trust `.Choice`
 
@@ -83,11 +82,10 @@ if tone.Confidence >= choiceConfidenceThreshold {
 
 A real run on "hey so, this might be nothing, but I wanted to flag it just
 in case. Not mad or anything..." returned `tone: "neutral"` at confidence
-`0.98`, with `probabilities: {"angry":0, "frustrated":0.01, "neutral":0.99}`,
-a lopsided distribution, safe to trust directly. A lower
-`Confidence` on a different state would mean the top two labels are close,
-which `.Probabilities` makes visible even though `.Choice` alone would hide
-it.
+`0.98`, with `probabilities: {"angry":0, "frustrated":0.01, "neutral":0.99}`.
+That distribution concentrates on one label, so `.Choice` can be trusted
+directly. A lower `Confidence` on a different state means the top two labels
+are close, which `.Probabilities` shows and `.Choice` alone does not.
 
 ### 4. Handle a `none`-style label as its own branch
 
@@ -107,10 +105,10 @@ default:
 }
 ```
 
-A real run on a thank-you-only ticket returned
-`topic: "none"` at confidence `1.0`. The model was completely sure the
-ticket didn't concern billing or login, a different (and more
-useful) signal than "the model couldn't decide."
+A real run on a thank-you-only ticket returned `topic: "none"` at confidence
+`1.0`. The model was certain the ticket concerned neither billing nor login.
+That is a different signal from a low-confidence answer, where the model did
+not settle on a label.
 
 ### 5. Read `ScoreAnswer` the same way: `Score`, `Confidence`, `Probabilities`
 
@@ -132,10 +130,10 @@ if urgency.Confidence < scoreConfidenceThreshold {
 
 A real run returned `urgency.Score = 1.67` at `Confidence = 0.5`, with
 `probabilities: {"0":0, "1":0.33, "2":0.67}` against
-`legend: {"0":"low","1":"medium","2":"high"}`. The model leaned toward
-"high" but wasn't concentrated there. `Score` alone (1.67, between
-medium and high) shows this, but `Confidence` makes it explicit: don't treat
-this one as settled.
+`legend: {"0":"low","1":"medium","2":"high"}`. The distribution leans toward
+"high" without concentrating there. `Score` of 1.67 sits between medium and
+high, and `Confidence` of 0.5 reports the same lack of concentration
+directly. Don't treat this answer as settled.
 
 ## Verify it works
 

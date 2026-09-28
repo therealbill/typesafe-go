@@ -167,7 +167,7 @@ type RawQuestion map[string]any
 ```
 
 RawQuestion is sent to the API unchanged. It must carry a string `"type"`
-field. Use it for question fields this package does not model yet.
+field. It carries question fields this package does not model yet.
 
 RawQuestion has no `MarshalJSON` method; it encodes with the standard
 `encoding/json` map encoding, producing a JSON object of its keys and values

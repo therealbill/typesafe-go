@@ -51,8 +51,6 @@ questions := typesafe.Questions{
 }
 ```
 
-One call, one round trip, three typed answers back.
-
 ### 2. Choose identifiers for what they mean to your code, not the model
 
 The map's keys (`"is_billing"`, `"tone"`, `"urgency"` above) name the
@@ -115,19 +113,18 @@ if isBilling > 0.5 {
 }
 ```
 
-This is the deciding question when you're designing a `Questions` map: does
-every question only need the original `state`, or does one of them need an
-answer that isn't known yet? The first case is one call; the second is two.
+When designing a `Questions` map, check what each question needs. Questions
+that need only the original `state` go in one call. A question that needs an
+answer you don't have yet goes in a second call.
 
 ### 5. Keep an eye on how many questions you're bundling into one call
 
-Each call's question mix, total count and the per-type breakdown, is
-available to instrumentation as `RequestInfo.QuestionCount`, `.NoulCount`,
-`.ChoiceCount`, and `.ScoreCount`. Nothing in the SDK caps how many questions
-you put in one map, but those counts exist so an `Instrumentation`
-implementation (or your own logging) can watch payload size and per-call
-latency as a `Questions` map grows, rather than only noticing after a call
-gets slow.
+Each call's question mix, the total count and the per-type breakdown,
+reaches instrumentation as `RequestInfo.QuestionCount`, `.NoulCount`,
+`.ChoiceCount`, and `.ScoreCount`. Nothing in the SDK caps how many
+questions you put in one map. Use those counts from an `Instrumentation`
+implementation or your own logging to track payload size and per-call
+latency as a `Questions` map grows.
 
 ### 6. Mix in a `RawQuestion` for a shape this package doesn't model yet
 
@@ -144,7 +141,7 @@ questions := typesafe.Questions{
 }
 ```
 
-That's the extent of it here. See
+See
 [How to Send Fields the SDK Does Not Model Yet](./send-fields-the-sdk-does-not-model-yet.md)
 for what validation `RawQuestion` does and doesn't get.
 

@@ -7,29 +7,29 @@ weight: 50
 
 # How Answers Are Decoded
 
-A `SystemOneResponse` carries a map of answers, and each answer can be a
-different shape depending on what kind of question it answers. Turning the
-raw JSON the server sends into `NoulAnswer`, `ChoiceAnswer`, or `ScoreAnswer`
-values takes more than a single `json.Unmarshal` call, since the shape to
-decode into depends on a field not yet read. This page walks through how
-`response.go` resolves that, and what falls out of the design: preserved
-unknown answers, deterministic error reporting, and error messages that speak
-the API's vocabulary rather than Go's.
+A `SystemOneResponse` carries a map of answers, and each answer's shape
+depends on the kind of question it answers. A single `json.Unmarshal` cannot
+turn that raw JSON into `NoulAnswer`, `ChoiceAnswer`, or `ScoreAnswer`
+values, because the shape to decode into depends on a field the decoder has
+not read yet. This page covers how `response.go` resolves that and what
+follows from it: preserved unknown answers, deterministic error reporting,
+and error messages in the API's vocabulary rather than Go's.
 
-## The problem: the shape depends on the type
+## The shape depends on the type
 
-A noul answer's wire JSON looks like `{"type": "noul", "noul": 0.8}`. A
-choice answer looks like `{"type": "choice", "choice": "angry", "confidence":
-0.9, "probabilities": {...}}`. A score answer adds a `legend`. These are
-different sets of required fields entirely, and a single Go struct with
-`json:"noul,omitempty"` alongside
-`json:"choice,omitempty"` couldn't tell "this field is absent because it's a
-choice answer" from "this field is absent and the response is malformed."
+A noul answer's wire JSON is `{"type": "noul", "noul": 0.8}`. A choice
+answer is `{"type": "choice", "choice": "angry", "confidence": 0.9,
+"probabilities": {...}}`. A score answer adds a `legend`. Each type requires
+a different set of fields. One Go struct carrying `json:"noul,omitempty"`
+alongside `json:"choice,omitempty"` would decode all three, but an absent
+`noul` field would then mean either that the answer is a choice answer or
+that the response is malformed, and the struct could not distinguish the
+two.
 
 ## Two passes: type first, then shape
 
-`decodeAnswer` in `response.go` resolves this by decoding twice. The first
-pass unmarshals only a header:
+`decodeAnswer` in `response.go` decodes twice. The first pass unmarshals
+only a header:
 
 ```go
 var head struct {
@@ -39,28 +39,29 @@ json.Unmarshal(raw, &head)
 ```
 
 `encoding/json` ignores fields a struct doesn't declare, so this first pass
-costs nothing beyond finding `"type"`; every other key in the object is
-skipped. Only once `head.Type` is known does `decodeAnswer` switch on
-it and run a second, type-specific unmarshal into an anonymous struct shaped
-for exactly that answer type: a `noul` object decodes into `struct{ Noul
-*float64 }`, a `choice` object into `struct{ Choice *string; Confidence
-*float64; Probabilities map[string]float64 }`, and so on. Each of those
-per-type structs uses pointer fields for its required values, so the decoder
-can tell a field absent from the JSON (a nil pointer) from a field present
-with a legitimate zero value: a `noul` of exactly `0.0` decodes to a non-nil
-pointer to `0.0`, and passes. A field that comes back nil after the second
-unmarshal produces a `ResponseValidationError` naming that field's path; a
-missing probability is never silently treated as zero.
+costs nothing beyond finding `"type"` and skips every other key in the
+object. `decodeAnswer` then switches on `head.Type` and runs a second,
+type-specific unmarshal into an anonymous struct shaped for exactly that
+answer type: a `noul` object into `struct{ Noul *float64 }`, a `choice`
+object into `struct{ Choice *string; Confidence *float64; Probabilities
+map[string]float64 }`, and so on.
 
-This is the only way to decode a type-tagged union in `encoding/json`
-without either guessing at the shape or requiring the caller to pre-declare
-which type they expect. The first pass answers "what shape do I need"; the
-second pass decodes that shape and validates it's complete.
+Each per-type struct uses pointer fields for its required values. A nil
+pointer after the second unmarshal means the field was absent from the JSON;
+a non-nil pointer to `0.0` means the server sent a `noul` of exactly `0.0`,
+which passes. A nil required field produces a `ResponseValidationError`
+naming that field's path, so a missing probability never decodes silently to
+zero.
 
-## `UnknownAnswer`: preserving what the library doesn't know
+Decoding a type-tagged union in `encoding/json` takes these two passes,
+short of guessing at the shape or requiring the caller to pre-declare which
+type they expect. The first pass determines the shape; the second decodes
+that shape and validates that it is complete.
 
-The type switch in `decodeAnswer` has three known cases (`noul`, `choice`,
-`score`) and a default. That default doesn't fail the decode:
+## `UnknownAnswer`
+
+The type switch in `decodeAnswer` has three known cases, `noul`, `choice`,
+and `score`, plus a default. The default does not fail the decode:
 
 ```go
 default:
@@ -68,19 +69,19 @@ default:
 ```
 
 `UnknownAnswer` stores the wire type and a copy of the exact bytes the
-server sent. Its `MarshalJSON` returns `Raw` unchanged, or, if `Raw` is
-empty (an `UnknownAnswer` built by hand rather than decoded), a minimal
-`{"type": a.Type}`. Decoding an answer of a type this version of the library
-doesn't model, then re-marshaling it, round-trips byte for byte.
+server sent. Its `MarshalJSON` returns `Raw` unchanged, or a minimal
+`{"type": a.Type}` when `Raw` is empty, which happens for an
+`UnknownAnswer` built by hand rather than decoded. An answer of a type this
+version of the library doesn't model round-trips byte for byte through a
+decode and a re-marshal.
 
-Anyone whose code path is "receive a response, maybe touch a few fields,
-pass it along" (a proxy, a logging wrapper, a cache) depends on this. If the
-API adds a fourth answer type tomorrow, an application built against
-today's library doesn't corrupt or silently drop that answer when it
-happens to flow through a marshal/unmarshal cycle; it comes out exactly as
-it went in. Failing to decode, or decoding to a zero value and losing the
-original bytes, would make every caller's upgrade path brittle to the
-server's own release schedule, not only the library's.
+A proxy, a logging wrapper, or a cache receives a response, touches a few
+fields, and passes it along. When the API adds a fourth answer type,
+an application built against today's library passes that answer through a
+marshal/unmarshal cycle unchanged rather than dropping or corrupting it.
+Failing the decode, or decoding to a zero value and losing the original
+bytes, would tie every caller's upgrade path to the server's release
+schedule and the library's.
 
 ## Deterministic field paths
 
@@ -99,27 +100,23 @@ for _, key := range keys {
 }
 ```
 
-Decoding stops at the first bad answer it encounters, and because the
-iteration order is fixed, "first" means the same thing every time: the
-alphabetically first malformed key. Without the sort, two runs against the
-identical malformed response body could report two different field paths,
-because Go randomizes map iteration order between runs by design. With
-it, a response with answers `"a"` and `"z"` both malformed always reports
-`answers.a...`, never `answers.z...` on one run and `answers.a...` on the
-next.
+Decoding stops at the first bad answer it encounters. The fixed iteration
+order makes that the alphabetically first malformed key on every run. Go
+randomizes map iteration order by design, so without the sort two runs
+against the identical malformed response body could report two different
+field paths. With it, a response whose `"a"` and `"z"` answers are both
+malformed always reports `answers.a...`.
 
-The sort costs little. A bug report that says "decoding fails at
-`answers.tone.confidence`" describes the same failure every time it's
-reproduced, and a test asserting on that field path doesn't flake depending
-on map iteration order.
+A bug report naming `answers.tone.confidence` describes the same failure
+every time it is reproduced, and a test asserting on that field path does
+not flake with map iteration order.
 
-## The typed decode path: `unmarshalAs`
+## `unmarshalAs`
 
 `NoulAnswer`, `ChoiceAnswer`, and `ScoreAnswer` each also implement
-`UnmarshalJSON` directly, for callers who already know which type they
-expect (for example, `SystemOneAs` decoding into a caller-defined struct
-field typed as `typesafe.NoulAnswer`). All three route through one generic
-helper:
+`UnmarshalJSON` directly, for callers that already know which type they
+expect, such as `SystemOneAs` decoding into a caller-defined struct field
+typed as `typesafe.NoulAnswer`. All three route through one generic helper:
 
 ```go
 func unmarshalAs[T Answer](b []byte, want string) (T, error) {
@@ -136,34 +133,32 @@ func unmarshalAs[T Answer](b []byte, want string) (T, error) {
 }
 ```
 
-`unmarshalAs` runs the same two-pass `decodeAnswer` and then does a type
-assertion. When the assertion fails (a caller declared a field as
-`NoulAnswer` but the server sent a choice answer for that question key), the
-error reads `expected noul answer, got choice`. That message uses the wire
-vocabulary, `"noul"` and `"choice"`, not the Go type names
-`typesafe.NoulAnswer` and `typesafe.ChoiceAnswer`. Someone debugging a live
-API response is looking at `curl` output or a captured request body with a
-`"type": "choice"` field in it, and a message built from that same
-vocabulary tells them directly what to check next. A message built from Go
-type names would require mapping `typesafe.ChoiceAnswer` back to `"choice"`
-first, before the error meant anything.
+`unmarshalAs` runs the same two-pass `decodeAnswer` and then asserts the
+type. A caller that declared a field as `NoulAnswer` for a question key the
+server answered with a choice gets `expected noul answer, got choice`. That
+message uses the wire vocabulary, `"noul"` and `"choice"`, not the Go type
+names `typesafe.NoulAnswer` and `typesafe.ChoiceAnswer`. Someone debugging a
+live API response is reading `curl` output or a captured request body
+carrying a `"type": "choice"` field, and the error names the same token they
+are looking at. Go type names would need mapping back to the wire type
+before the error pointed anywhere.
 
-## The raw body as escape hatch
+## `RawResponse`
 
-Whatever the typed decode does or doesn't capture, `SystemOneResponse.Raw`
-is populated on every successful call:
+`SystemOneResponse.Raw` is populated on every successful call, whatever the
+typed decode did or did not capture:
 
 ```go
 out.Raw = &RawResponse{Status: resp.StatusCode, Header: resp.Header.Clone(), Body: raw}
 ```
 
 `RawResponse` holds the exact status, headers, and body bytes the server
-returned, independent of how the typed decode into `Answers` went.
-`RawResponse` serves the same purpose as `UnknownAnswer`: the typed model
-layers over the wire format, without replacing it. A caller who hits a
-decode limitation the typed API doesn't handle (a field the library doesn't
-expose, a response shape from a newer API version) can always fall back to
-`Raw.Body` and parse it themselves, without making a second network call.
+returned, independent of how the typed decode into `Answers` went. It serves
+the same purpose as `UnknownAnswer`: the typed model layers over the wire
+format without replacing it. A caller that hits a decode limitation the
+typed API doesn't handle, such as a field the library doesn't expose or a
+response shape from a newer API version, parses `Raw.Body` directly and
+makes no second network call.
 
 ## Related documentation
 

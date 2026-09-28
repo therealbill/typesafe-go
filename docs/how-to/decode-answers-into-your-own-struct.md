@@ -135,7 +135,7 @@ RequestID: req_demo123
 **Symptom**: `triage.Spam` is `nil` after a successful decode (`err ==
 nil`).
 **Cause**: the question identifier tagging that field wasn't present in the
-response's `answers` object. This is not an error, by design.
+response's `answers` object. This is not an error.
 **Solution**: check the identifier against what you put in
 `Questions`, and confirm the model was asked that question in this call.
 

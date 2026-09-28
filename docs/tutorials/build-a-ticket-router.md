@@ -28,11 +28,10 @@ A command-line Go program that:
 4. Runs that routing logic against more than one ticket, so you can see it
    take different paths.
 
-Every command below is one you actually run. The checkpoints show real
-output captured from the live API. TypeSafe's judgments come from a model,
-not a lookup table. If you run these programs yourself, expect your
-probabilities, confidence values, and scores to land close to what's shown
-here, though they will rarely match to the decimal.
+Every command below is a command you run. The checkpoints show output
+captured from the live API. TypeSafe's judgments come from a model, not a
+lookup table, so your probabilities, confidence values, and scores will land
+close to the values shown here and will rarely match them to the decimal.
 
 ## Prerequisites
 
@@ -154,9 +153,9 @@ Before you run it:
 - `department` is a `Choice` with four labels, and one of them, `"none"`, maps
   to `nil` instead of a description. A `nil` value in `Choice.Criteria` leaves
   a label undescribed; it does not remove the label. The model can still pick
-  `none`, but isn't told what `none` means beyond its name. That gives the
-  model an explicit way to say "this ticket doesn't fit any real department"
-  instead of forcing a bad fit onto `billing`, `technical`, or `account`.
+  `none`, but is not told what `none` means beyond its name. `none` gives the
+  model a label for a ticket that fits no real department, instead of forcing
+  the ticket onto `billing`, `technical`, or `account`.
 - `needs_human` is a second `Noul`, independent of `billing`. A single call
   can ask more than one probability question; you're not limited to one
   judgment per question type.
@@ -178,16 +177,16 @@ urgency:     0.97
 needs_human: 0.58
 ```
 
-Four independent answers came from one call: `billing` is almost certainly
-about billing, the model picked the `billing` department with full
-confidence, `urgency` sits low on the 0–2 rubric, and `needs_human` landed
-near the middle. This ticket doesn't obviously need a person, but it isn't a
-clear no either.
+One call returned four independent answers. `billing` is 0.99, so the model
+reads the ticket as almost certainly a billing problem. It picked the
+`billing` department with full confidence. `urgency` sits low on the 0–2
+rubric. `needs_human` landed at 0.58, near the middle of the range, which is
+neither a clear yes nor a clear no.
 
 ## Step 3: Turn the answers into a routing decision
 
-Reading four answers is only half the job. Asking them together supports
-making one decision from all four at once. Replace the body of `main.go`:
+The four answers combine into a single routing decision. Replace the body of
+`main.go`:
 
 ```go
 package main
@@ -282,13 +281,14 @@ func route(needsHuman, urgency float64, department typesafe.ChoiceAnswer) string
 `route` checks three things, in order:
 
 1. If `needs_human` is above `0.6`, or `urgency` is above `1.5` (past
-   "somewhat urgent" and leaning toward "very urgent" on the 0–2 rubric), the
-   ticket goes to a human queue outright. Either the model flagged it
-   directly, or it's urgent enough that an automated reply is a risk.
+   "somewhat urgent" and toward "very urgent" on the 0–2 rubric), the ticket
+   goes to a human queue. The first condition covers a ticket the model
+   flagged for review; the second covers one urgent enough that an automated
+   reply carries risk.
 2. Otherwise, if the `department` choice's `Confidence` is below `0.6`, the
-   ticket still goes to the human queue. A department pick the model isn't
-   confident about shouldn't be trusted to route straight to that team.
-3. Only if neither of those trips does the ticket go to `department.Choice`
+   ticket still goes to the human queue. A department pick the model is not
+   confident about does not route straight to that team.
+3. If neither condition holds, the ticket goes to `department.Choice`
    directly.
 
 Run it:
@@ -317,10 +317,9 @@ under `0.6`, `urgency` (`0.96`) is under `1.5`, and `department`'s confidence
 
 ## Step 4: Route more than one ticket
 
-One ticket routing correctly doesn't prove much. The interesting part is
-seeing `route` take different paths. Replace `main.go` once more to loop over
-three tickets chosen to land differently: a clear billing complaint, an
-angry and urgent one, and a calm but ambiguous one.
+Three tickets take three different paths through `route`. Replace `main.go`
+once more to loop over a clear billing complaint, an angry and urgent one,
+and a calm but ambiguous one.
 
 ```go
 package main
@@ -467,17 +466,16 @@ The three tickets take different paths through `route`:
 
 - The first ticket repeats Step 3's result: low `needs_human`, low `urgency`,
   high department confidence, so it routes straight to `billing`.
-- The second ticket trips the first check two ways at once. `needs_human`
-  (`0.88`) is clearly above `0.6`, and `urgency` (`2.00`) is pinned at the top of
-  the rubric. Either one alone would have sent it to the human queue; here
-  both do.
+- The second ticket trips the first check on both of its conditions.
+  `needs_human` (`0.88`) is above `0.6`, and `urgency` (`2.00`) is pinned at
+  the top of the rubric. Either condition alone sends a ticket to the human
+  queue.
 - The third ticket is calm and not urgent: `urgency` is `0.00` and
-  `needs_human` is `0.38`, comfortably under threshold. But it mentions both
-  a payment method and a profile setting, so the model split its confidence
+  `needs_human` is `0.38`, both comfortably under threshold. It mentions a
+  payment method and a profile setting, so the model split its confidence
   across `account` and `billing`. `department`'s confidence (`0.58`) falls
-  just under `0.6`, so the third check catches it: a low-confidence
-  department pick goes to the human queue even though nothing else about the
-  ticket looked risky.
+  under `0.6`, so the third check sends the ticket to the human queue on a
+  low-confidence department pick alone.
 
 In the third case, `department.Choice` still holds a value (`account`) even
 though `route` didn't use it. A `Choice` answer always names a label.
