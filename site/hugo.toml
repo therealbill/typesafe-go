@@ -12,6 +12,8 @@ enableRobotsTXT = true
   [[module.mounts]]
     source = "../docs"
     target = "content/docs"
+    # excludeFiles is deprecated but the replacement files setting did not
+    # exclude subdirectories as of Hugo 0.166.0; revisit when it does.
     excludeFiles = "superpowers/**"
 
 [markup]

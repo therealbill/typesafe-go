@@ -19,9 +19,9 @@ while IFS= read -r page; do
   name=$(basename "$page")
   dirlink="$(basename "$(dirname "$page")")/"
   if [ "$name" = "_index.md" ]; then
-    grep -rqE --include='*.md' -e "${dirlink}_index\.md\)|${dirlink}\)" README.md docs && continue
+    grep -rqE --include='*.md' --exclude-dir=superpowers -e "${dirlink}_index\.md\)|${dirlink}\)" README.md docs && continue
     echo "unlinked: $page"; status=1
-  elif ! grep -rq --include='*.md' -F "$name" README.md docs; then
+  elif ! grep -rq --include='*.md' --exclude-dir=superpowers -F "$name" README.md docs; then
     echo "unlinked: $page"; status=1
   fi
 done < <(find docs -name '*.md' -not -path 'docs/superpowers/*' | sort)
