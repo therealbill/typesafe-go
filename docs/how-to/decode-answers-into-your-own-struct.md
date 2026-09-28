@@ -115,7 +115,7 @@ Decoding into `T` alone keeps only what your struct's fields ask for —
 ## Verify it works
 
 A fake server returns a canned response with `RequestID` set via the
-`X-Typesafe-Request-Id` response header — which is where the real client
+`x-typesafe-request-id` response header — which is where the real client
 always reads it from, not from a `request_id` field in the body. Running the
 code from Steps 1, 2, and 5 against it prints:
 

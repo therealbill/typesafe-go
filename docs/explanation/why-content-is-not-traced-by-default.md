@@ -100,7 +100,7 @@ safe to record by default, and anything that might carry sensitive payload
 content requires the caller to say so explicitly. `typesafe/otel`'s opt-ins
 are that same default, applied to spans instead of log lines.
 
-## Related reading
+## Related documentation
 
 - For the full list of span attributes and exactly which recorded value
   populates each one, see the

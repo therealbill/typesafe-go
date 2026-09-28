@@ -39,12 +39,12 @@ here but will rarely match to the decimal — that's expected, not a bug.
 - Go 1.25 or newer installed
 - A TypeSafe API key
 
-This tutorial assumes you're comfortable with the basics covered in
-[Your First Judgment in Go](first-judgment-in-go.md) — sending `state`,
+This tutorial assumes you're comfortable with the basics: sending `state`,
 defining questions, and reading typed answers back with `Nouls()`,
-`Choices()`, and `Scores()`. If you haven't done that tutorial yet, it isn't
-required to follow along here, but it covers ground this one moves past
-quickly.
+`Choices()`, and `Scores()`. If any of that is unfamiliar, the
+[question types](../reference/question-types.md) and
+[response types](../reference/response-types.md) references cover it —
+nothing here requires having followed another tutorial first.
 
 ## Step 1: Set up a module and install the library
 

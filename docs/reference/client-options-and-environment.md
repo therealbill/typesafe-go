@@ -17,7 +17,10 @@ type Client struct {
 }
 ```
 
-Client calls the TypeSafe API. It is safe for concurrent use.
+Client calls the TypeSafe API. It is safe for concurrent use. The zero value
+is not usable; build one with `NewClient`. Because a `Client` is safe for
+concurrent use, one `Client` should be built and shared across goroutines
+rather than constructed per call or per request.
 
 ### NewClient
 
@@ -130,7 +133,7 @@ Option configures a Client.
 | `WithModel` | `func WithModel(m string) Option` | Sets the default model. Otherwise `TYPESAFE_DEFAULT_MODEL` or `jev-latest` is used. |
 | `WithRetryPolicy` | `func WithRetryPolicy(p RetryPolicy) Option` | Replaces the default retry policy. |
 | `WithTimeout` | `func WithTimeout(d time.Duration) Option` | Sets the timeout for each HTTP attempt. Default 10s. Zero disables the per-attempt timeout. A negative duration returns an error immediately (`typesafe: timeout must not be negative`). |
-| `WithHeaders` | `func WithHeaders(h http.Header) Option` | Adds headers to every request. The `http.Header` is cloned when this option is constructed (not when it is later applied to a `Client`), so a caller that mutates its header value afterward cannot change what the client sends. |
+| `WithHeaders` | `func WithHeaders(h http.Header) Option` | Adds headers to every request. A header given here replaces the one the client would send, so supplying `Authorization` replaces the API key header, which some gateways require. The `http.Header` is cloned when this option is constructed (not when it is later applied to a `Client`), so a caller that mutates its header value afterward cannot change what the client sends. |
 | `WithHTTPClient` | `func WithHTTPClient(hc *http.Client) Option` | Uses a caller-supplied `http.Client`. The client is copied so the caller's value is not modified when instrumentation wraps its transport. |
 | `WithInstrumentation` | `func WithInstrumentation(i Instrumentation) Option` | Attaches an observer, such as the otel subpackage's. |
 | `WithLogger` | `func WithLogger(l *slog.Logger) Option` | Sets the logger. Otherwise `TYPESAFE_LOG_LEVEL` selects a text logger on stderr, and unset means no logging. |
@@ -174,7 +177,7 @@ recorded.
 | `WithRequestModel` | `func WithRequestModel(m string) RequestOption` | Overrides the client's model for this call. |
 | `WithRequestRetry` | `func WithRequestRetry(p RetryPolicy) RequestOption` | Overrides the retry policy for this call. |
 | `WithRequestTimeout` | `func WithRequestTimeout(d time.Duration) RequestOption` | Overrides the per-attempt timeout for this call. Zero disables the per-attempt timeout. A negative duration returns `&typesafe.ValidationError{Path: "timeout", Err: errors.New("timeout must not be negative")}` immediately, before any network call. |
-| `WithExtraHeaders` | `func WithExtraHeaders(h http.Header) RequestOption` | Adds headers to this call, replacing client headers with the same name. As with `WithHeaders`, the `http.Header` is cloned when this option is constructed, not when it is applied, so a caller that mutates its header value afterward cannot change the call. |
+| `WithExtraHeaders` | `func WithExtraHeaders(h http.Header) RequestOption` | Adds headers to this call, replacing client headers with the same name. As with `WithHeaders`, an `Authorization` header given here replaces the API key header. The `http.Header` is cloned when this option is constructed, not when it is applied, so a caller that mutates its header value afterward cannot change the call. |
 | `WithExtraBody` | `func WithExtraBody(fields map[string]any) RequestOption` | Merges fields into the top level of the request body. Use it for API fields this package does not model yet. The map is copied when this option is constructed, not when it is applied. The keys the client sets itself — `state`, `model`, `questions` — are rejected if present, with `&typesafe.ValidationError{Path: "extra_body.<key>", Err: errors.New("field is set by the client and must not be overridden")}`. |
 
 ## NewLogger

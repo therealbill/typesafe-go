@@ -176,14 +176,10 @@ Exit code 0. That stderr line comes from the OTel SDK's own default error
 handler, not a `jev:`-prefixed message — a tracing misconfiguration must
 never turn a working `ask`/`models` call into a failure.
 
-**`jev` is a much heavier binary than the core library.** The root
-`typesafe` package has zero dependencies; `jev`'s `go.mod` carries roughly
-90 indirect requirements once `otelconf` is in the graph — the AWS SDK,
-Kubernetes' `client-go`, Prometheus's client libraries, several OTLP
-exporters — none of which the core client needs. See
+**`jev` is a much heavier binary than the core library.** See
 [Why the Core Is Stdlib-Only](../explanation/why-the-core-is-stdlib-only.md)
-for why that split exists and how to get tracing without paying for it in
-your own binary.
+for why the core has zero dependencies while `jev` carries the OpenTelemetry
+stack, and how to get tracing without paying for it in your own binary.
 
 ## Troubleshooting
 

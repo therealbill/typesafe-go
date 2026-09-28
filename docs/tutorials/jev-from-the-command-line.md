@@ -319,7 +319,7 @@ You built `jev` from source and used it to:
 
 - **See the full flag and command reference**: [jev CLI reference](../reference/jev-cli.md)
 - **Look up any exit code or error field**: [errors and exit codes reference](../reference/errors-and-exit-codes.md)
-- **Call System One from Go instead of the shell**: [Your First Judgment in Go](../tutorials/first-judgment-in-go.md)
+- **Call System One from Go instead of the shell**: [client options and environment](../reference/client-options-and-environment.md) covers building a `*Client` and calling `SystemOne` from your own program
 - **Script or automate `jev` calls**: [Drive jev from a script or agent](../how-to/drive-jev-from-a-script-or-agent.md)
 
 ## Troubleshooting
