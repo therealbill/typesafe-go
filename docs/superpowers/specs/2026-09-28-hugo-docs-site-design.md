@@ -22,16 +22,23 @@ docs, a custom domain, analytics, comments, and any change to the Go code.
   file. The site therefore lives in `site/` with its own nested `go.mod`,
   which Go ignores.
 - Hugo can mount a parent directory: a site in `site/` mounting `../docs`
-  builds correctly, and Hextra's own link render hook resolves the existing
-  `../reference/x.md` cross-links to page URLs (verified 2026-09-28 with Hugo
-  0.166.0 and Hextra v0.12.3). No render-hook configuration is needed; the
-  `renderHooks.link.enableDefault` key was removed in Hugo 0.148.
-- The mount `files` glob setting did not exclude a subdirectory in testing
-  (three pattern forms tried), so `docs/superpowers/` is kept out of the site
-  with Hugo build options instead: a `docs/superpowers/_index.md` whose front
-  matter sets `build: {render: never, list: never}` and cascades the same to
-  every descendant. Verified: no page rendered, nothing in the sidebar,
-  nothing in the search index.
+  builds correctly (verified 2026-09-28 with Hugo 0.166.0 and Hextra
+  v0.12.3). Hextra's own link render hook resolves only absolute
+  destinations, so the existing `../reference/x.md` cross-links need a
+  project-level `site/layouts/_markup/render-link.html` that extends
+  Hextra's hook with a branch resolving relative `.md` destinations through
+  `.PageInner.GetPage`. (An earlier probe mistook sidebar hrefs for resolved
+  body links.) The removed `renderHooks.link.enableDefault` key is not used.
+- Hugo parses shortcode syntax in every mounted file before build options
+  apply, and the implementation plan under `docs/superpowers/` contains
+  literal `{{<` text, so `build: {render: never}` alone leaves the build
+  broken. The mount therefore uses the deprecated but functional
+  `excludeFiles = "superpowers/**"` (the replacement `files` setting did not
+  exclude a subdirectory in six pattern forms tried on 0.166.0), and
+  `docs/superpowers/_index.md` keeps the cascaded `build: {render: never,
+  list: never}` as a second guard. Verified: no page rendered, nothing in the
+  sidebar, nothing in the search index. Revisit when `files` gains a working
+  exclusion form.
 - Hextra builds the edit link from the absolute filesystem path for mounted
   files, producing a broken URL, so edit links are disabled.
 - Hextra selects its sidebar layouts by Hugo `type: docs`. The pages' current
@@ -51,6 +58,7 @@ site/
   go.mod, go.sum            Hugo module github.com/therealbill/typesafe-go/site;
                             requires github.com/imfing/hextra v0.12.3
   content/_index.md         landing page, layout hextra-home
+  layouts/_markup/render-link.html   extends Hextra's hook for relative .md links
 docs/
   _index.md                 "Documentation": the Diátaxis compass
   superpowers/_index.md     build: render never, list never; cascaded
@@ -66,7 +74,7 @@ docs/
 ```toml
 baseURL      = "https://therealbill.github.io/typesafe-go/"
 title        = "typesafe-go"
-languageCode = "en-us"
+locale       = "en-us"      # languageCode is deprecated in 0.166
 enableRobotsTXT = true
 
 [module]
@@ -78,6 +86,7 @@ enableRobotsTXT = true
   [[module.mounts]]
     source = "../docs"
     target = "content/docs"
+    excludeFiles = "superpowers/**"
 
 [markup.goldmark.renderer]
   unsafe = true            # Hextra shortcodes emit HTML
