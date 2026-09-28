@@ -19,5 +19,5 @@ so they skip background and go straight to the steps.
 - [Act on probabilities and confidence](act-on-probabilities-and-confidence.md)
 - [Send fields the SDK does not model yet](send-fields-the-sdk-does-not-model-yet.md)
 - [Configure logging](configure-logging.md)
-- [Run the self-review](run-the-self-review.md)
+- [Review your codebase with Jev](review-your-codebase-with-jev.md)
 - [Cut a release](cut-a-release.md)

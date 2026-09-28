@@ -17,5 +17,5 @@ without advice. Guidance on choosing between options lives in the
 - [jev CLI](jev-cli.md)
 - [Span attributes](span-attributes.md)
 - [jev ask wire format](jev-ask-wire-format.md)
-- [Self-review tool](self-review-tool.md)
+- [jev review](jev-review.md)
 - [Makefile and repository layout](makefile-and-repository-layout.md)

@@ -17,4 +17,4 @@ library's behavior. None of them is a procedure to follow. Read one when a
 - [How answers are decoded](how-answers-are-decoded.md)
 - [The instrumentation hook](the-instrumentation-hook.md)
 - [The agent-facing CLI contract](the-agent-facing-cli-contract.md)
-- [What the self-review measures](what-the-self-review-measures.md)
+- [What jev review measures](what-jev-review-measures.md)
