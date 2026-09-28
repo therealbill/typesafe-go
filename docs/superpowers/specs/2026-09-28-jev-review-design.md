@@ -121,12 +121,12 @@ exits:
 | 0 | every unit ran and nothing unaccepted was flagged |
 | 1 | config missing or invalid, report not writable, zero units matched, or bad flags (`kind` `usage`) |
 | 3–7 | a unit's API call failed and the failure was not recoverable, classified as for `ask` (the report still lists the unit with its error) |
-| 8 | at least one unaccepted flag fired (`kind` `flagged`) |
+| 8 | at least one unit is failing: an unaccepted flag fired, a file or spec heading was missing, or the unit timed out (`kind` `flagged`; the report says which) |
 
 A unit whose call fails with an API or transport error is recorded in the
 report with `error` set and counts as failing; the process exit code is the
 classifier's code for the first such error if any occurred, otherwise 8 if
-flagged, otherwise 0. On any non-zero exit the stderr line and, for codes 1
+any unit is failing, otherwise 0. On any non-zero exit the stderr line and, for codes 1
 and 3–7, the stdout JSON envelope follow the existing CLI rules; for exit 8
 stdout carries the report (Markdown or JSON) and stderr the summary line.
 
