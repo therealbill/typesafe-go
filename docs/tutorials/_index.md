@@ -14,3 +14,4 @@ sections are for.
 
 - [Your first judgment in Go](first-judgment-in-go.md)
 - [jev from the command line](jev-from-the-command-line.md)
+- [Build a ticket router in Go](build-a-ticket-router.md)
