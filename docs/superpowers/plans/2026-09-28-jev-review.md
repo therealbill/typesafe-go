@@ -1378,19 +1378,19 @@ Each new page's front matter carries `aliases` with the old site path so old lin
 | `docs/reference/jev-review.md` (weight 80) | `["/docs/reference/self-review-tool/"]` |
 | `docs/explanation/what-jev-review-measures.md` (weight 80) | `["/docs/explanation/what-the-self-review-measures/"]` |
 
-- [ ] **Step 1: How-to** (`diataxis-docs:doc-howto-writer`)
+- [x] **Step 1: How-to** (`diataxis-docs:doc-howto-writer`)
 
 Goal: review your own codebase with `jev review`. Prerequisites: a `jev` binary (release download or `make build`), `TYPESAFE_API_KEY`, a Markdown spec with headings. Steps: run `jev review init`; edit the file (one unit per spec section; paths relative to the file; `spec_heading` must match a heading line exactly); write behaviors as one concrete testable claim each, five to fifteen per unit, with two good and two bad examples; run `jev review`; read the table and the flagged lines; for each flag decide between adding a test (when the behavior is untested), fixing the spec or the code (when they disagree), or recording an acceptance with a note (when the reading is noise), and show the `accepted` and `notes` fields; rerun; tune thresholds with `--min-cover` and friends on your own data; use `--only` while iterating. Every command output comes from a real run against a scratch repository under the scratchpad with two or three units, using the live API. Use this repository's `jev-review.json` as the worked example of a mature config. Link to the reference and the explanation.
 
-- [ ] **Step 2: Reference** (`diataxis-docs:doc-reference-gen`)
+- [x] **Step 2: Reference** (`diataxis-docs:doc-reference-gen`)
 
 From source and `--help`: `jev review` and `jev review init`, every flag with its default, the config schema (each field, type, required or optional, path resolution rule, the acceptance rule and why `covers_NN` is rejected), the four question texts verbatim from `internal/review/review.go`, the report document schema (every `UnitReport` field), the Markdown table columns, thresholds and defaults, exit codes (0, 1, 3 to 7, 8) with the rule for which applies, and the `weakest_area` labels with their descriptions. Facts only.
 
-- [ ] **Step 3: Explanation** (`diataxis-docs:doc-explanation-writer`)
+- [x] **Step 3: Explanation** (`diataxis-docs:doc-explanation-writer`)
 
 What each question type measures and what its number means; why thresholds sit inside the model's drift band, with this repository's observed ranges as the example (contradiction readings of 0.35 to 0.50 on identical input, thoroughness 1.94 to 2.06); what acceptances and stale-acceptance lines record; how unit boundaries change readings (the retry unit moved from 1.68 to 2.99 when `transport.go` and `client_test.go` joined it); why it is a development aid and not a CI gate; what it cannot tell you.
 
-- [ ] **Step 4: Landing pages and commit**
+- [x] **Step 4: Landing pages and commit**
 
 Replace the three old entries in the section `_index.md` lists with the new titles and paths. Then:
 
