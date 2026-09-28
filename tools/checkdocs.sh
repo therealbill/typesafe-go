@@ -17,7 +17,11 @@ strip_code() {
 
 while IFS= read -r page; do
   name=$(basename "$page")
-  if ! grep -rq --include='*.md' -F "$name" README.md docs; then
+  dirlink="$(basename "$(dirname "$page")")/"
+  if [ "$name" = "_index.md" ]; then
+    grep -rqE --include='*.md' -e "${dirlink}_index\.md\)|${dirlink}\)" README.md docs && continue
+    echo "unlinked: $page"; status=1
+  elif ! grep -rq --include='*.md' -F "$name" README.md docs; then
     echo "unlinked: $page"; status=1
   fi
 done < <(find docs -name '*.md' -not -path 'docs/superpowers/*' | sort)
@@ -30,6 +34,6 @@ while IFS= read -r file; do
     if [ ! -e "$dir/$link" ]; then
       echo "broken link in $file: $link"; status=1
     fi
-  done < <(strip_code "$file" | grep -oE '\]\([^)]+\)' | sed -E 's/^\]\((.*)\)$/\1/' || true)
+  done < <(strip_code "$file" | grep -v -e '{{<' -e '{{%' | grep -oE '\]\([^)]+\)' | sed -E 's/^\]\((.*)\)$/\1/' || true)
 done < <({ echo README.md; find docs -name '*.md' -not -path 'docs/superpowers/*'; } | sort)
 exit $status

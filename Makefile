@@ -5,7 +5,7 @@ LDFLAGS  := -s -w -X $(MODULE)/internal/version.Version=$(VERSION) -X $(MODULE)/
 
 .DEFAULT_GOAL := help
 .DELETE_ON_ERROR:
-.PHONY: help test lint vuln build integration selfreview docs clean
+.PHONY: help test lint vuln build integration selfreview docs site site-serve clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-12s %s\n", $$1, $$2}'
@@ -30,8 +30,14 @@ integration: ## Run the live API test (needs TYPESAFE_API_KEY)
 selfreview: build ## Run the Jev-driven self-review (needs TYPESAFE_API_KEY)
 	go run ./tools/selfreview -jev ./bin/jev
 
-docs: ## Check that every docs/ page is reachable from README.md and links resolve
+docs: site ## Build the site and check that every docs/ page is reachable and links resolve
 	@./tools/checkdocs.sh
 
+site: ## Build the documentation site into site/public
+	cd site && hugo --gc --minify
+
+site-serve: ## Serve the documentation site locally with live reload
+	cd site && hugo server --buildDrafts --navigateToChanged
+
 clean: ## Remove build outputs
-	rm -rf bin dist coverage.out selfreview-report.json
+	rm -rf bin dist coverage.out selfreview-report.json site/public site/resources
