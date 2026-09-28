@@ -71,7 +71,7 @@ Start order: spawn `site` on Task 1 and `docs` on Task 2 at the same time. When 
 - Modify: every `docs/**/*.md` except `docs/superpowers/**` (17 files)
 - Create: `docs/superpowers/_index.md`
 
-- [ ] **Step 1: Migrate `type:` to `diataxis:` and add weights**
+- [x] **Step 1: Migrate `type:` to `diataxis:` and add weights**
 
 Run this script from the repo root. It rewrites only the front matter block and fails loudly if a page lacks `type:`.
 
@@ -119,7 +119,7 @@ grep -L '^diataxis: ' $(find docs -name '*.md' -not -path 'docs/superpowers/*' -
 ```
 Expected: both lists empty.
 
-- [ ] **Step 2: Create `docs/superpowers/_index.md`**
+- [x] **Step 2: Create `docs/superpowers/_index.md`**
 
 ```markdown
 ---
@@ -139,7 +139,7 @@ the project. They are kept in the repository for history and are excluded
 from the published documentation site.
 ```
 
-- [ ] **Step 3: Verify the link checker still passes and commit**
+- [x] **Step 3: Verify the link checker still passes and commit**
 
 ```bash
 ./tools/checkdocs.sh && echo "checkdocs ok"
@@ -157,7 +157,7 @@ Expected: `checkdocs ok`. (If the checker reports `docs/superpowers/_index.md` a
 **Files:**
 - Create: `docs/_index.md`, `docs/tutorials/_index.md`, `docs/how-to/_index.md`, `docs/reference/_index.md`, `docs/explanation/_index.md`
 
-- [ ] **Step 1: Write `docs/_index.md`**
+- [x] **Step 1: Write `docs/_index.md`**
 
 ```markdown
 ---
@@ -179,7 +179,7 @@ New here? Start with [Your first judgment in Go](tutorials/first-judgment-in-go.
 Looking for a specific option or flag? Go straight to the reference.
 ```
 
-- [ ] **Step 2: Write the four section pages**
+- [x] **Step 2: Write the four section pages**
 
 `docs/tutorials/_index.md`:
 ```markdown
@@ -266,7 +266,7 @@ and mental models. Nothing here is a step to follow; read them when a
 
 Task 7 appends the new pages to these lists.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add docs/_index.md docs/tutorials/_index.md docs/how-to/_index.md docs/reference/_index.md docs/explanation/_index.md
@@ -283,7 +283,7 @@ git commit -m "Add Diátaxis section landing pages"
 - Create: `site/hugo.toml`, `site/go.mod`, `site/go.sum`, `site/content/_index.md`
 - Modify: `.gitignore`
 
-- [ ] **Step 1: Initialize the Hugo module and fetch Hextra**
+- [x] **Step 1: Initialize the Hugo module and fetch Hextra**
 
 ```bash
 mkdir -p site/content && cd site
@@ -294,7 +294,7 @@ grep hextra site/go.mod
 ```
 Expected: `github.com/imfing/hextra v0.12.3`. Do not run `go mod tidy` at the repo root; the nested module is invisible to it, but confirm with `go build ./... && git status --short go.mod` showing no change to the root `go.mod`.
 
-- [ ] **Step 2: Write `site/hugo.toml`**
+- [x] **Step 2: Write `site/hugo.toml`**
 
 ```toml
 baseURL = "https://therealbill.github.io/typesafe-go/"
@@ -353,7 +353,7 @@ enableRobotsTXT = true
       type = "search"
 ```
 
-- [ ] **Step 3: Write the landing page `site/content/_index.md`**
+- [x] **Step 3: Write the landing page `site/content/_index.md`**
 
 ```markdown
 ---
@@ -418,7 +418,7 @@ fmt.Println(res.Nouls()["billing"].Noul, res.Choices()["tone"].Choice)
 {{< /hextra/feature-grid >}}
 ```
 
-- [ ] **Step 4: Add build outputs to `.gitignore`**
+- [x] **Step 4: Add build outputs to `.gitignore`**
 
 Append:
 ```
@@ -427,7 +427,7 @@ site/resources/
 site/.hugo_build.lock
 ```
 
-- [ ] **Step 5: Build and verify**
+- [x] **Step 5: Build and verify**
 
 ```bash
 cd site && hugo --gc --minify 2>&1 | tail -3; cd ..
@@ -440,14 +440,14 @@ echo "--- search index ---"; ls site/public/*.search-data.json && grep -c 'super
 ```
 Expected: no WARN or ERROR lines; 23 or more pages; 0 superpowers; at least one resolved reference href; 0 raw `.md` hrefs; all four section names present; search index exists with 0 superpowers hits. If the build reports a deprecation warning for any key in `hugo.toml`, fix the key and note it in the report.
 
-- [ ] **Step 6: Smoke the dev server**
+- [x] **Step 6: Smoke the dev server**
 
 ```bash
 (cd site && hugo server --port 1313 >/tmp/hugo-server.log 2>&1 &) ; sleep 4; curl -fsS http://localhost:1313/typesafe-go/ | grep -o '<title>[^<]*</title>'; curl -fsS http://localhost:1313/typesafe-go/docs/how-to/ | grep -o '<title>[^<]*</title>'; pkill -f 'hugo server --port 1313'
 ```
 Expected: two `<title>` lines.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add site/hugo.toml site/go.mod site/go.sum site/content/_index.md .gitignore
@@ -463,7 +463,7 @@ git commit -m "Add Hextra Hugo site mounting docs/"
 **Files:**
 - Modify: `Makefile`, `tools/checkdocs.sh`
 
-- [ ] **Step 1: Makefile**
+- [x] **Step 1: Makefile**
 
 Add `site site-serve` to `.PHONY`, make `docs` depend on `site`, and add the two targets after `docs`:
 
@@ -479,7 +479,7 @@ site-serve: ## Serve the documentation site locally with live reload
 ```
 Also add `site/public` and `site/resources` to the `clean` target's `rm -rf`.
 
-- [ ] **Step 2: checkdocs.sh**
+- [x] **Step 2: checkdocs.sh**
 
 Two changes in `tools/checkdocs.sh`:
 
@@ -509,7 +509,7 @@ And change the link extraction to strip shortcode lines:
 ```
 (Keep the existing `strip_code` fence handling that was added earlier; apply the shortcode filter after it.)
 
-- [ ] **Step 3: Verify and commit**
+- [x] **Step 3: Verify and commit**
 
 ```bash
 make docs && echo "docs ok"
@@ -528,7 +528,7 @@ Expected: `docs ok`; help lists `docs`, `site`, `site-serve`. If `make docs` rep
 **Files:**
 - Create: `.github/workflows/hugo-deploy.yml`, `.github/workflows/hugo-pr.yml`
 
-- [ ] **Step 1: Write `hugo-deploy.yml`**
+- [x] **Step 1: Write `hugo-deploy.yml`**
 
 ```yaml
 name: Deploy documentation site
@@ -595,7 +595,7 @@ jobs:
 ```
 `actions/setup-go` is needed because Hugo modules shell out to `go` to fetch the theme.
 
-- [ ] **Step 2: Write `hugo-pr.yml`**
+- [x] **Step 2: Write `hugo-pr.yml`**
 
 ```yaml
 name: Documentation site build check
@@ -632,7 +632,7 @@ jobs:
           echo "Size: $(du -sh site/public | cut -f1)" >> "$GITHUB_STEP_SUMMARY"
 ```
 
-- [ ] **Step 3: Validate YAML and commit**
+- [x] **Step 3: Validate YAML and commit**
 
 ```bash
 python3 -c "import yaml,sys; [yaml.safe_load(open(f)) for f in ['.github/workflows/hugo-deploy.yml','.github/workflows/hugo-pr.yml']]; print('yaml ok')"
@@ -646,17 +646,17 @@ Expected: `yaml ok`. Report "Task 5 done" to the lead.
 
 **Agent:** `docs` (after Task 2 is committed)
 
-- [ ] **Step 1: Run the inventory**
+- [x] **Step 1: Run the inventory**
 
 Dispatch `diataxis-docs:doc-inventory` with this brief:
 
 > Inventory `/Users/bill/Projects/gojev/docs/`, excluding `docs/superpowers/`. The Diátaxis kind of each page is in the `diataxis:` front-matter key (values tutorial, how-to, reference, explanation); `_index.md` files are section landing pages, not content. Classify each page by its actual content, flag any page whose content leaks into another quadrant (a how-to that teaches concepts, a reference that gives advice, an explanation with steps), and list gaps: things the code does that no page covers. The code is in the repository root (`*.go`), `otel/`, `internal/cli/`, `tools/selfreview/`, and the Makefile; read `go doc -all .` and `./bin/jev --help` (run `make build` first) to see the surface. Write `inventory.json` to `/private/tmp/claude-501/-Users-bill-Projects-gojev/b96adec7-3da2-45f5-b6b1-95fdebc40eb3/scratchpad/inventory.json`, not into the repo, and return the leakage findings and gap list in your report.
 
-- [ ] **Step 2: Reconcile with the candidate list**
+- [x] **Step 2: Reconcile with the candidate list**
 
 Compare the inventory's gaps with the spec's candidate table (14 pages). For each candidate, confirm the behavior exists in the code by reading the source; drop any candidate that does not. Keep any inventory gap that the code supports and the candidates missed. For each leakage finding on an existing page, decide: move the leaking paragraph to the right quadrant's page (existing or new), or leave it with a one-line justification.
 
-- [ ] **Step 3: Report and wait**
+- [x] **Step 3: Report and wait**
 
 Send the lead: the final page list per quadrant with a one-line scope each and the intended file name, the leakage decisions, and the inventory's classification of the 17 existing pages. Do not start Task 7 until the lead replies.
 
@@ -708,7 +708,7 @@ Briefs for the candidate pages (adjust to the approved list):
 
 **Explanation `docs/explanation/what-the-self-review-measures.md`** (weight 80): how the tool turns the spec into Noul, Score, and Choice questions, why thresholds sit inside the model's drift band, what acceptances record, the retry unit-boundary lesson, and why it is a development tool rather than a CI gate.
 
-- [ ] **Step 1: Write and commit per quadrant**
+- [x] **Step 1: Write and commit per quadrant**
 
 After each quadrant's pages pass the docs agent's own source check, append them to that section's `_index.md` list and commit:
 
@@ -729,7 +729,7 @@ Adjust messages to the approved list. Report all hashes.
 **Files:**
 - Modify: `README.md`, any page the validator flags
 
-- [ ] **Step 1: README**
+- [x] **Step 1: README**
 
 In the `## Documentation` section, add as the first line:
 
@@ -738,7 +738,7 @@ Published at <https://therealbill.github.io/typesafe-go/>. Sources are under [do
 ```
 Then add the new pages to the existing per-quadrant link lines.
 
-- [ ] **Step 2: Validate**
+- [x] **Step 2: Validate**
 
 Dispatch `diataxis-docs:doc-crosslink-validator` over `docs/` (excluding `superpowers/`) and `README.md` with this note in the brief:
 
@@ -751,7 +751,7 @@ make docs && echo "docs ok"
 ```
 Expected: `docs ok` with no output from the checker.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add README.md docs
@@ -767,9 +767,9 @@ Report "Task 8 done" with the validator's summary counts.
 
 The user reviewed the pages and found model mannerisms throughout: contrast-reveal sentences, narrated reasoning, staccato declaratives, em dashes, and prose that explains itself to the reader. Every page under `docs/` (excluding `superpowers/`), `README.md`, and `site/content/_index.md` gets an editing pass against Strunk and White: omit needless words, active voice, positive form, concrete language, one topic per paragraph, imperatives for instructions and plain declaratives for facts, third person in explanations, no em dashes, no rhetorical framing, no first-person narration. Facts, code, outputs, links, tables, headings, and front matter stay exactly as they are.
 
-- [ ] **Step 1: Dispatch one editing subagent per quadrant plus one for README and the landing page**, each with the rubric verbatim.
-- [ ] **Step 2: Read every edited page against the rubric; run the em-dash and banned-phrase greps before and after and report both counts.**
-- [ ] **Step 3: `make docs` passes; commit as "Edit documentation for plain, direct prose".**
+- [x] **Step 1: Dispatch one editing subagent per quadrant plus one for README and the landing page**, each with the rubric verbatim.
+- [x] **Step 2: Read every edited page against the rubric; run the em-dash and banned-phrase greps before and after and report both counts.**
+- [x] **Step 3: `make docs` passes; commit as "Edit documentation for plain, direct prose".**
 
 ---
 
@@ -777,14 +777,14 @@ The user reviewed the pages and found model mannerisms throughout: contrast-reve
 
 **Agent:** lead (after Tasks 5 and 8 are committed)
 
-- [ ] **Step 1: Enable GitHub Pages from Actions (idempotent)**
+- [x] **Step 1: Enable GitHub Pages from Actions (idempotent)**
 
 ```bash
 gh api repos/therealbill/typesafe-go/pages >/dev/null 2>&1 && echo "pages already enabled" || gh api -X POST repos/therealbill/typesafe-go/pages -f build_type=workflow -q '.html_url'
 ```
 Expected: `https://therealbill.github.io/typesafe-go/`.
 
-- [ ] **Step 2: Push and watch**
+- [x] **Step 2: Push and watch**
 
 ```bash
 git push origin main
@@ -794,7 +794,7 @@ gh run watch $(gh run list --workflow "Deploy documentation site" --limit 1 --js
 ```
 Expected: the run completes with conclusion success.
 
-- [ ] **Step 3: Check the live site**
+- [x] **Step 3: Check the live site**
 
 ```bash
 curl -fsS https://therealbill.github.io/typesafe-go/ | grep -o '<title>[^<]*</title>'
@@ -809,13 +809,13 @@ Expected: two titles; the third returns 404. Pages can take a minute after the d
 
 **Agent:** lead
 
-- [ ] **Step 1: Local gate**
+- [x] **Step 1: Local gate**
 
 ```bash
 make lint && make test && make docs && git status --short && echo "(clean)"
 ```
 Expected: all pass, working tree clean.
 
-- [ ] **Step 2: Tick the plan and report**
+- [x] **Step 2: Tick the plan and report**
 
 Tick every step in this plan, commit the plan, push, and report: commit count, page count on the site, the deploy run URL, and anything the user should check by hand (search, dark mode, phone width).
