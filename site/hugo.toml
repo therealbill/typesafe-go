@@ -1,0 +1,55 @@
+baseURL = "https://therealbill.github.io/typesafe-go/"
+title = "typesafe-go"
+locale = "en-us"
+enableRobotsTXT = true
+
+[module]
+  [[module.imports]]
+    path = "github.com/imfing/hextra"
+  [[module.mounts]]
+    source = "content"
+    target = "content"
+  [[module.mounts]]
+    source = "../docs"
+    target = "content/docs"
+    excludeFiles = "superpowers/**"
+
+[markup]
+  [markup.goldmark.renderer]
+    unsafe = true
+  [markup.highlight]
+    noClasses = false
+
+[params]
+  description = "Go client and jev CLI for the TypeSafe System One API"
+  [params.navbar]
+    displayTitle = true
+    displayLogo = false
+  [params.theme]
+    default = "system"
+    displayToggle = true
+  [params.search]
+    enable = true
+    type = "flexsearch"
+  [params.editURL]
+    enable = false
+  [params.footer]
+    displayCopyright = false
+    displayPoweredBy = false
+
+[menu]
+  [[menu.main]]
+    name = "Docs"
+    pageRef = "/docs"
+    weight = 1
+  [[menu.main]]
+    name = "GitHub"
+    url = "https://github.com/therealbill/typesafe-go"
+    weight = 2
+    [menu.main.params]
+      icon = "github"
+  [[menu.main]]
+    name = "Search"
+    weight = 3
+    [menu.main.params]
+      type = "search"
