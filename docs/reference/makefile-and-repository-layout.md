@@ -5,8 +5,6 @@ diataxis: reference
 weight: 90
 ---
 
-# Makefile and Repository Layout
-
 ## `make help`
 
 Captured by running `make help` from the repository root:

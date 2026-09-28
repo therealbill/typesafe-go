@@ -5,8 +5,6 @@ diataxis: explanation
 weight: 60
 ---
 
-# The Instrumentation Hook
-
 `SystemOne` and `ListModels` both call `c.startInstrument` before they do
 anything else. This page describes what that hook receives, when it fires
 relative to the rest of the call, and how the `otel` subpackage turns it

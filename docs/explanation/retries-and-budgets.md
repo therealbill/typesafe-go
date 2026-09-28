@@ -5,8 +5,6 @@ diataxis: explanation
 weight: 20
 ---
 
-# Retries and Budgets
-
 A call to `SystemOne` or `ListModels` can fail for reasons unrelated to the request itself: a dropped connection, a momentarily overloaded System One, a rate limit. `RetryPolicy` handles that class of failure so a caller does not write a retry loop at every call site. Retrying on its own turns one slow response into a much slower one, and turns a fleet of clients into a thundering herd against an already-struggling server. `RetryPolicy` therefore combines bounded exponential backoff with jitter, ceilings on both the server's stated wait and the retry schedule, and a fixed line between failures worth retrying and failures that fail again regardless.
 
 ## What gets retried

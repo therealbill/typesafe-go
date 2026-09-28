@@ -5,8 +5,6 @@ diataxis: explanation
 weight: 70
 ---
 
-# The Agent-Facing CLI Contract
-
 `jev` takes flags, reads stdin, writes stdout, and returns an exit code. Its
 primary caller is a script or an autonomous agent that spawns `jev` as a
 subprocess, feeds it a request, and needs to know programmatically, and

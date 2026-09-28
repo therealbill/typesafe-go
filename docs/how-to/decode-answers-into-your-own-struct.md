@@ -5,8 +5,6 @@ diataxis: how-to
 weight: 20
 ---
 
-# How to Decode Answers into Your Own Struct
-
 **Goal**: Replace `res.Nouls()["id"]`-style map lookups with a struct of your
 own that `SystemOneAs[T]` decodes directly, and handle the validation errors
 decoding can produce.

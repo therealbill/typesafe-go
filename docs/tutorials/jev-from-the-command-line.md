@@ -5,8 +5,6 @@ diataxis: tutorial
 weight: 20
 ---
 
-# jev from the Command Line
-
 TypeSafe's System One models turn a piece of application state into typed
 judgments: a probability, a label chosen from a set, or a position on a
 rubric. The `jev` CLI sends those requests without writing any code. You

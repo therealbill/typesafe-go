@@ -5,8 +5,6 @@ diataxis: reference
 weight: 40
 ---
 
-# Errors and Exit Codes
-
 Package: `github.com/therealbill/typesafe-go` (import path `typesafe`), source `errors.go`. The `jev` CLI's exit-code and error-JSON behavior is implemented in `internal/cli/exit.go`.
 
 ## Error types

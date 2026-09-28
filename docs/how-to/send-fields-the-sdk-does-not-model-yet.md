@@ -5,8 +5,6 @@ diataxis: how-to
 weight: 80
 ---
 
-# How to Send Fields the SDK Does Not Model Yet
-
 **Goal**: Send a question shape or a top-level request field that
 `typesafe-go` doesn't model with a Go type yet, from both the Go SDK
 (`RawQuestion`, `WithExtraBody`) and `jev ask`'s JSON mode, and know exactly

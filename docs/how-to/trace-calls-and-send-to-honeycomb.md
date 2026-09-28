@@ -5,8 +5,6 @@ diataxis: how-to
 weight: 40
 ---
 
-# How to Trace Calls and Send Them to Honeycomb
-
 **Goal**: Emit OpenTelemetry spans for `SystemOne`/`ListModels` calls (from
 your own Go program and from the `jev` CLI) and route them to Honeycomb.
 

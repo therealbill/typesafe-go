@@ -5,8 +5,6 @@ diataxis: how-to
 weight: 50
 ---
 
-# How to Drive jev from a Script or Agent
-
 **Goal**: Treat `jev` as a subprocess API, the way a script or an autonomous
 agent should: feed it JSON on stdin, parse its JSON on stdout, and branch
 reliably on its exit code.

@@ -5,8 +5,6 @@ diataxis: how-to
 weight: 70
 ---
 
-# How to Act on Probabilities and Confidence
-
 **Goal**: Turn `NoulAnswer`, `ChoiceAnswer`, and `ScoreAnswer` values into
 decisions your code can act on, without treating a probability near the
 middle as a third label or a confident answer as more certain than it is.

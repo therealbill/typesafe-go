@@ -5,8 +5,6 @@ diataxis: reference
 weight: 30
 ---
 
-# Response Types
-
 Package: `github.com/therealbill/typesafe-go` (import path `typesafe`).
 
 ## Answer

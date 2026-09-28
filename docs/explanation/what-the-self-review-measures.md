@@ -5,8 +5,6 @@ diataxis: explanation
 weight: 80
 ---
 
-# What the Self-Review Measures
-
 `tools/selfreview` sends this repository's own code to its AI provider and
 asks two questions about each unit of the codebase: does the test suite
 exercise what the spec requires, and does the implementation contradict the

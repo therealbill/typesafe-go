@@ -5,8 +5,6 @@ diataxis: how-to
 weight: 90
 ---
 
-# How to Configure Logging
-
 **Goal**: Turn on `typesafe-go`'s request logging at the level you need, know
 exactly what each level logs (and that it never logs your API key or request
 bodies), and control it the same way from `jev`.

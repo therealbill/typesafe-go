@@ -5,8 +5,6 @@ diataxis: tutorial
 weight: 30
 ---
 
-# Build a Ticket Router in Go
-
 A single `SystemOne` call can carry more than one question. In this tutorial
 you'll send one support ticket to TypeSafe and ask four independent questions
 about it at once, then combine the four answers into a routing decision a

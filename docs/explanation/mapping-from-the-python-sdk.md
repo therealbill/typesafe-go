@@ -5,8 +5,6 @@ diataxis: explanation
 weight: 40
 ---
 
-# Mapping from the Python SDK
-
 Both SDKs wrap the same System One API and preserve the same wire semantics. Go's type system, concurrency model, and error-handling idioms turn several Python conveniences into different shapes. This page maps each piece of the Python `typesafe-sdk` surface onto its Go counterpart and describes what changed in the translation.
 
 ## One client, not two

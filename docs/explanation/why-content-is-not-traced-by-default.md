@@ -5,8 +5,6 @@ diataxis: explanation
 weight: 30
 ---
 
-# Why Content Is Not Traced by Default
-
 A `typesafe.Client` wrapped with `typesafe/otel.New()` produces a span for
 every `SystemOne` call. The span carries the call's metadata: which model
 answered, how many tokens it used, how many retries it took, whether it

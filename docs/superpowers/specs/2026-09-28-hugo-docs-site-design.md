@@ -161,7 +161,11 @@ cascade:
 ---
 ```
 
-followed by one paragraph stating what the quadrant is for and what it is
+Pages carry no `# Title` line in the body: Hextra renders the front-matter
+`title` as the H1, so a body heading would render twice (found on the live
+site and removed on 2026-09-28).
+
+Each section landing page is followed by one paragraph stating what the quadrant is for and what it is
 not, and Hextra's `{{< cards >}}` or a plain list linking every page in the
 section. `docs/_index.md` carries `type: docs` itself (so it renders with the
 sidebar), describes the four quadrants in a two-by-two framing, and links each

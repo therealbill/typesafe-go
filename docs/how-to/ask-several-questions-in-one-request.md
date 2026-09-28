@@ -5,8 +5,6 @@ diataxis: how-to
 weight: 60
 ---
 
-# How to Ask Several Questions in One Request
-
 **Goal**: Put several independent questions about the same state into one
 `Questions` map so they're answered in a single `SystemOne` call, and
 recognize the point where a question depends on another's answer and needs a

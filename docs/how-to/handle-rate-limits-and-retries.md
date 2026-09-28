@@ -5,8 +5,6 @@ diataxis: how-to
 weight: 10
 ---
 
-# How to Handle Rate Limits and Retries
-
 **Goal**: Configure how `typesafe-go` retries failed requests, detect a rate
 limit explicitly, and use `IsRetryable` to drive your own higher-level retry
 logic.

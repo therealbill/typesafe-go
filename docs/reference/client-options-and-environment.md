@@ -5,8 +5,6 @@ diataxis: reference
 weight: 10
 ---
 
-# Client Options and Environment
-
 Package: `github.com/therealbill/typesafe-go` (import path `typesafe`).
 
 ## Client

@@ -5,8 +5,6 @@ diataxis: explanation
 weight: 50
 ---
 
-# How Answers Are Decoded
-
 A `SystemOneResponse` carries a map of answers, and each answer's shape
 depends on the kind of question it answers. A single `json.Unmarshal` cannot
 turn that raw JSON into `NoulAnswer`, `ChoiceAnswer`, or `ScoreAnswer`

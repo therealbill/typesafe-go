@@ -5,8 +5,6 @@ diataxis: reference
 weight: 60
 ---
 
-# Span Attributes
-
 Package: `github.com/therealbill/typesafe-go/otel` (import path `otel`).
 
 Package otel instruments a `typesafe.Client` with OpenTelemetry traces.

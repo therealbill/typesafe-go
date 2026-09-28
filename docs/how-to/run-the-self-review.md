@@ -5,8 +5,6 @@ diataxis: how-to
 weight: 100
 ---
 
-# How to Run the Self-Review
-
 **Goal**: Run `make selfreview` to have Jev judge whether your tests cover
 what the spec requires, read its Markdown report, and decide when to add a
 test versus record an accepted exception.

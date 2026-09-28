@@ -5,8 +5,6 @@ diataxis: reference
 weight: 20
 ---
 
-# Question Types
-
 Package: `github.com/therealbill/typesafe-go` (import path `typesafe`).
 
 ## JSONContent

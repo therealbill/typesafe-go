@@ -5,8 +5,6 @@ diataxis: reference
 weight: 70
 ---
 
-# jev ask Wire Format
-
 This page documents the JSON document shapes for `jev ask`: the request
 document it parses, the response document it prints, and the error envelope
 it prints on failure. Flags, input modes, and subcommand-level

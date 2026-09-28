@@ -5,8 +5,6 @@ diataxis: reference
 weight: 50
 ---
 
-# jev CLI
-
 Binary: `jev` (built at `./bin/jev`). Source: `internal/cli`.
 
 ## Synopsis

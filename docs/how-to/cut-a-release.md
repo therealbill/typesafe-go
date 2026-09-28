@@ -5,8 +5,6 @@ diataxis: how-to
 weight: 110
 ---
 
-# How to Cut a Release
-
 **Goal**: Trigger a `jev` release by pushing a version tag, and know exactly
 what the automated pipeline builds and publishes from it.
 

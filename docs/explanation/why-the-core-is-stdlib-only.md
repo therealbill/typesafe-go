@@ -5,8 +5,6 @@ diataxis: explanation
 weight: 10
 ---
 
-# Why the Core Is Stdlib-Only
-
 The root `typesafe` package imports only the standard library: `net/http`, `encoding/json`, `context`, `time`, and `log/slog`. The module's `go.mod` lists other dependencies, but none is reachable from the root package. This page describes why that boundary exists and what it costs.
 
 An SDK that emits telemetry usually imports an observability framework directly. Every program that uses the SDK then compiles and ships that framework and its dependency graph, whether or not it traces anything. For a library meant to be embedded in other people's binaries, that is a cost paid by everyone for a feature used by some.

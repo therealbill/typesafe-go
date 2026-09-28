@@ -5,8 +5,6 @@ diataxis: how-to
 weight: 30
 ---
 
-# How to Call Through a Gateway
-
 **Goal**: Route `typesafe-go` traffic through an API gateway or corporate
 proxy instead of `https://api.typesafe.ai` directly, while keeping the
 client's own authentication and adding what the gateway requires.

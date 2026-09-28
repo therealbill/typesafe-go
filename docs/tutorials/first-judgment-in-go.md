@@ -5,8 +5,6 @@ diataxis: tutorial
 weight: 10
 ---
 
-# Your First Judgment in Go
-
 TypeSafe's System One models turn a piece of application state into typed
 judgments: a probability, a label chosen from a set, or a position on a
 rubric. In this tutorial you'll write a small Go program that sends a support

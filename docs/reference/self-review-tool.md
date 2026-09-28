@@ -5,8 +5,6 @@ diataxis: reference
 weight: 80
 ---
 
-# Self-Review Tool
-
 `tools/selfreview` is a Go `main` package (run as `go run ./tools/selfreview`
 or built separately) that asks Jev, through the `jev` CLI, whether each unit
 of this repository's tests covers the behaviors its spec section requires and
