@@ -7,13 +7,13 @@ weight: 50
 
 # How to Drive jev from a Script or Agent
 
-**Goal**: Treat `jev` as a subprocess API — feed it JSON on stdin, parse its
-JSON on stdout, and branch reliably on its exit code — the way a script or
-an autonomous agent should.
+**Goal**: Treat `jev` as a subprocess API, the way a script or an autonomous
+agent should: feed it JSON on stdin, parse its JSON on stdout, and branch
+reliably on its exit code.
 
 ## Prerequisites
 
-- A built `./bin/jev` and a `TYPESAFE_API_KEY` — see
+- A built `./bin/jev` and a `TYPESAFE_API_KEY`, see
   [jev from the Command Line](../tutorials/jev-from-the-command-line.md)
 - `jq` installed, for the examples below
 - Full flag and JSON-shape reference:
@@ -38,16 +38,16 @@ With no `-f`, `jev ask` reads the request body shape from stdin:
 decodes into the matching typed question; anything else is passed through
 as a `RawQuestion`. Any top-level field besides `state`, `questions`, and
 `model` is forwarded as extra request-body fields
-(`typesafe.WithExtraBody`) — useful for API fields `jev` doesn't model yet
+(`typesafe.WithExtraBody`), useful for API fields `jev` doesn't model yet
 without needing a new release to send them.
 
-Whichever input source you use — stdin, `-f`/`--file`, or `@path` passed to
-`--state` — `jev` caps input at 16 MiB, failing as a usage error (exit 1)
-before any request.
+`jev` caps input at 16 MiB for any input source, whether stdin,
+`-f`/`--file`, or `@path` passed to `--state`, failing as a usage error
+(exit 1) before any request.
 
 If `jev ask` gets none of `--file`, `--state`, `--noul`, `--choice`, or
 `--score`, and stdin is an interactive terminal, it fails immediately with
-a "no request given" error instead of hanging — see Troubleshooting below.
+a "no request given" error instead of hanging. See Troubleshooting below.
 
 ### 2. Parse the success shape on stdout
 
@@ -58,12 +58,12 @@ On success, `jev ask` writes one JSON object to stdout:
 ```
 
 `request_id` is omitted when empty. This is the only thing written to
-stdout on success — safe to pipe straight into `jq` or a JSON parser with no
+stdout on success, safe to pipe straight into `jq` or a JSON parser with no
 extra filtering.
 
 ### 3. Parse the error shape on failure
 
-On failure, `jev` writes JSON to **stdout**, not just an error to stderr:
+On failure, `jev` writes JSON to **stdout**, not only an error to stderr:
 
 ```json
 {"error": {"kind": "...", "status": 0, "request_id": "...", "message": "..."}}
@@ -78,11 +78,11 @@ jev: <error>
 ```
 
 A script that only checks the exit code and ignores stdout on failure will
-miss `kind`, `status`, and `request_id` — parse stdout on both success and
+miss `kind`, `status`, and `request_id`. Parse stdout on both success and
 failure paths.
 
 This holds for every non-zero exit, even a mistake in how the script
-invoked `jev` — the same `{"error":...}` envelope lands on stdout
+invoked `jev`. The same `{"error":...}` envelope lands on stdout
 regardless.
 
 ### 4. Branch on the exit code
@@ -90,17 +90,17 @@ regardless.
 | Code | Meaning |
 |---|---|
 | 0 | OK |
-| 1 | Usage — bad flags, unreadable/invalid JSON, missing API key, or an unrecognized/unexpected error |
-| 2 | Validation — request failed client-side validation |
-| 3 | Auth — 401 or 403 |
-| 4 | Request — other 4xx (400, 404, 422) |
-| 5 | Rate limit — 429, after retries |
-| 6 | Server — 5xx after retries, or an unreadable 2xx body |
-| 7 | Connection — failure or timeout |
-| 130 | Interrupted — the context was cancelled, conventionally by SIGINT |
+| 1 | Usage: bad flags, unreadable/invalid JSON, missing API key, or an unrecognized/unexpected error |
+| 2 | Validation: request failed client-side validation |
+| 3 | Auth: 401 or 403 |
+| 4 | Request: other 4xx (400, 404, 422) |
+| 5 | Rate limit: 429, after retries |
+| 6 | Server: 5xx after retries, or an unreadable 2xx body |
+| 7 | Connection: failure or timeout |
+| 130 | Interrupted: the context was cancelled, conventionally by SIGINT |
 
 Exit code 1 now covers two `kind` values: `"usage"` (bad flags, missing key,
-malformed input) and `"internal"` (an unrecognized error) — read `kind` from
+malformed input) and `"internal"` (an unrecognized error). Read `kind` from
 stdout (Step 3) to tell them apart.
 
 Full classification order and edge cases:
@@ -110,13 +110,13 @@ Full classification order and edge cases:
 
 Without `--raw`, `jev` re-encodes the parsed response (Step 2), honoring
 `--pretty`. With `--raw`, it writes the server's response bytes unchanged
-plus a trailing newline — for when a script wants the API's response
+plus a trailing newline, for when a script wants the API's response
 passed through untouched, byte for byte.
 
 ### 6. Skip `--pretty` when piping to `jq`
 
 `--pretty` indents JSON for a human reading it directly. A script parsing
-with `jq` or any JSON library doesn't need it — compact JSON is simpler to
+with `jq` or any JSON library doesn't need it. Compact JSON is simpler to
 pipe.
 
 ## Verify it works
@@ -172,8 +172,8 @@ $ ./bin/jev ask --state "I was charged twice this month and nobody answers my em
 angry
 ```
 
-✅ Success! The subprocess contract — JSON in, JSON out, a meaningful exit
-code — holds for both the happy path and a real failure.
+✅ Success! The subprocess contract (JSON in, JSON out, a meaningful exit
+code) holds for both the happy path and a real failure.
 
 ## Troubleshooting
 
@@ -181,21 +181,21 @@ code — holds for both the happy path and a real failure.
 **Symptom**: retry logic fires on a 401 (which will never succeed) the same
 way it fires on a 429 or a connection error (which might).
 **Cause**: exit codes are treated as boolean instead of switched on.
-**Solution**: `case`/`switch` over the full table in Step 4 — retry on 5 and
+**Solution**: `case`/`switch` over the full table in Step 4. Retry on 5 and
 7, never on 1, 2, or 3.
 
 ### Problem: error details are missing even though the script checked stdout
 **Symptom**: a script logs only the stderr `jev: <error>` line and loses
 `kind`/`status`/`request_id`.
 **Cause**: on failure, the structured error object is on stdout, not
-stderr — the reverse of many CLIs' convention.
+stderr, the reverse of many CLIs' convention.
 **Solution**: always parse stdout as JSON; branch on `.error` being
 present.
 
 ### Problem: `jq` fails to parse `jev`'s output
 **Symptom**: `jq: error: Invalid numeric literal` or similar, only with
 `--raw`.
-**Cause**: `--raw` passes the server's bytes through unchanged — if the
+**Cause**: `--raw` passes the server's bytes through unchanged. If the
 response isn't the shape your filter expects, `jq` chokes on it like any
 unexpected JSON.
 **Solution**: drop `--raw` unless you specifically want the untouched
@@ -205,7 +205,7 @@ shape.
 ### Problem: `jev ask` exits immediately with "no request given"
 **Symptom**: exit code 1, a `"usage"` error on stdout, no hang.
 **Cause**: no `--file` and no question flags, and stdin is an interactive
-terminal — almost always accidental; a caller that always pipes JSON never
+terminal, almost always accidental; a caller that always pipes JSON never
 hits this.
 **Solution**: pipe JSON to stdin, or pass `-f`/`--file` or `--state`/question
 flags explicitly.

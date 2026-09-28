@@ -14,9 +14,9 @@ where validation still applies and where it doesn't.
 
 ## Prerequisites
 
-- A working `SystemOne` call — see
+- A working `SystemOne` call, see
   [Your First Judgment in Go](../tutorials/first-judgment-in-go.md)
-- Familiarity with `Questions` and the typed question kinds — see
+- Familiarity with `Questions` and the typed question kinds, see
   [Ask several questions in one request](./ask-several-questions-in-one-request.md)
   and the [question types reference](../reference/question-types.md)
 
@@ -26,7 +26,7 @@ where validation still applies and where it doesn't.
 
 `RawQuestion` is `map[string]any`, sent to the API unchanged. The only
 validation this package applies is that it carries a non-empty string
-`"type"` field — everything else is the API's call, not this package's:
+`"type"` field. Everything else is the API's call, not this package's:
 
 ```go
 questions := typesafe.Questions{
@@ -57,7 +57,7 @@ res, err := client.SystemOne(ctx, state, questions,
 )
 ```
 
-Running this against a fake server and printing what the server actually
+Running this against a fake server and printing what the server
 received shows the shallow merge:
 
 ```
@@ -70,7 +70,7 @@ mutating it afterward doesn't change a call already built with it.
 ### 3. Know which three field names `WithExtraBody` will always reject
 
 `state`, `model`, and `questions` are set by the client itself and cannot be
-overridden through `WithExtraBody` — this is checked before any network
+overridden through `WithExtraBody`. This is checked before any network
 call:
 
 ```go
@@ -81,7 +81,7 @@ _, err := client.SystemOne(ctx, state, questions,
 ```
 
 That check runs even when the client is pointed at an address nothing is
-listening on — proving it never gets as far as opening a connection:
+listening on, proving it never gets as far as opening a connection:
 
 ```
 Path:  extra_body.model
@@ -92,7 +92,7 @@ Error: typesafe: invalid request: extra_body.model: field is set by the client a
 
 `jev ask`'s JSON input mode (`{"state": ..., "questions": {...}, "model":
 ...}` plus anything else) treats three kinds of unrecognized content
-differently, and it's worth being precise about which is which:
+differently:
 
 - An unrecognized **top-level** field passes through unchanged, becoming an
   extra body field (fed to `WithExtraBody` internally).
@@ -104,9 +104,9 @@ differently, and it's worth being precise about which is which:
   so a typo or an extra key inside one of them is a JSON decode error, not a
   pass-through.
 
-A request combining the first two — an unrecognized top-level field
+A request combining the first two, an unrecognized top-level field
 (`routing_tag`) and a question with an unrecognized `type`
-(`sentiment_v2`) — passes `jev`'s own validation entirely and reaches the
+(`sentiment_v2`), passes `jev`'s own validation entirely and reaches the
 API, which then makes its own decision:
 
 ```json
@@ -132,10 +132,10 @@ $ ./bin/jev ask -f request.json --pretty
 }
 ```
 
-That `"kind": "request"` and a populated `request_id` are the tell: `jev`
+That `"kind": "request"` and a populated `request_id` show that `jev`
 sent this request and the *API* rejected it (exit code 4, per the
-[errors and exit codes reference](../reference/errors-and-exit-codes.md)) —
-this particular API account doesn't recognize `routing_tag` or the
+[errors and exit codes reference](../reference/errors-and-exit-codes.md)).
+This particular API account doesn't recognize `routing_tag` or the
 `sentiment_v2` question type, but `jev` itself raised no objection to
 either. A gateway or a future API version that *does* recognize one or both
 would accept the same request unchanged.
@@ -167,9 +167,9 @@ $ ./bin/jev ask -f request.json --pretty
 }
 ```
 
-No `request_id`, `"kind": "usage"`, exit code 1: this never left the
+No `request_id`, `"kind": "usage"`, and exit code 1 mean this never left the
 process. `confidence_threshold` isn't a real field of `noul`, `choice`, or
-`score` in this SDK — there's no equivalent of `RawQuestion`'s leniency once
+`score` in this SDK. There's no equivalent of `RawQuestion`'s leniency once
 you're inside one of the three typed shapes.
 
 ## Verify it works
@@ -189,7 +189,7 @@ fields inside a typed question do not.
 
 ### Problem: `WithExtraBody` field never shows up in the request
 **Symptom**: the server doesn't see a field you passed to `WithExtraBody`.
-**Cause**: the map was mutated after being passed to `WithExtraBody` — the
+**Cause**: the map was mutated after being passed to `WithExtraBody`. The
 option copies it once, at construction time, not on every call.
 **Solution**: build a fresh map (or a fresh call to `WithExtraBody`) for
 each request instead of reusing and mutating one.
@@ -198,16 +198,16 @@ each request instead of reusing and mutating one.
 **Symptom**: a call using `WithExtraBody` fails immediately with a
 `ValidationError`.
 **Cause**: the map passed to `WithExtraBody` used one of the three reserved
-keys — `state`, `model`, or `questions`.
+keys: `state`, `model`, or `questions`.
 **Solution**: rename the field, or set it through the SDK's own parameters
 (`state`, `WithRequestModel`, `questions`) instead.
 
 ### Problem: `jev ask` rejects a field you expected to pass through
 **Symptom**: `"kind": "usage"` with a `json: unknown field` message.
 **Cause**: the field is inside a `noul`, `choice`, or `score` question
-object, where `jev` decodes strictly — this is the one place pass-through
+object, where `jev` decodes strictly. This is the one place pass-through
 doesn't apply.
-**Solution**: if the API genuinely needs that field on a typed question,
+**Solution**: if the API needs that field on a typed question,
 there's no way to send it through `jev ask`'s flag or typed-JSON path today;
 open an issue, or send it as a fully custom `RawQuestion`/raw JSON document
 instead of a `noul`/`choice`/`score` object.

@@ -10,8 +10,8 @@ weight: 60
 Every `SystemOne` or `ListModels` call passes through one seam before it
 does anything else: `c.startInstrument`. This page looks at what that hook
 sees, when it fires relative to the rest of the call, and how the `otel`
-subpackage turns it into OpenTelemetry spans — as one example of what the
-interface makes possible, not the only thing it could do.
+subpackage turns it into OpenTelemetry spans, one example of what the
+interface makes possible and not the only one.
 
 ## Why a hook instead of a dependency
 
@@ -30,9 +30,9 @@ boundary discussed in
 [Why the core is stdlib-only](why-the-core-is-stdlib-only.md): a caller who
 never wires up `typesafe/otel` never compiles in OpenTelemetry's dependency
 graph, and the core package stays testable against plain fakes. This page
-picks up from there to look at the hook's own shape — what it's told, when
+picks up from there to look at the hook's own shape (what it's told, when
 it's called, and what a second, non-tracing implementation of it would look
-like.
+like).
 
 ## What `RequestStart` receives: `RequestInfo`
 
@@ -53,13 +53,13 @@ type RequestInfo struct {
 from `countQuestions`, which walks the `Questions` map once and tallies how
 many are `Noul`, `Choice`, or `Score` (including the pointer forms, and
 `RawQuestion` values whose `"type"` field matches one of those three
-strings) — cheap, non-sensitive shape information an implementation can
+strings): cheap, non-sensitive shape information an implementation can
 record unconditionally. `State` and `Questions` are the actual request
 payload, and the field comments in `instrument.go` say plainly:
-"Instrumentation must not record them unless the caller opted in." That's
-not enforced by the type system — `RequestInfo.State` is just `any` — it's a
-contract the interface documents and `otel.WithRecordContent` is the one
-implementation that honors it, off by default. See
+"Instrumentation must not record them unless the caller opted in."
+`RequestInfo.State` is typed `any`, so the type system doesn't enforce
+this. It's a contract the interface documents, and `otel.WithRecordContent`
+is the one implementation that honors it, off by default. See
 [Why content is not traced by default](why-content-is-not-traced-by-default.md)
 for the reasoning behind that default.
 
@@ -80,10 +80,10 @@ type RequestResult struct {
 }
 ```
 
-`Response` is nil in every case except a successful `system_one` call — a
+`Response` is nil in every case except a successful `system_one` call: a
 `ListModels` call, or any failed call, never populates it. `Attempts` is
-something `RequestInfo` couldn't have told you at the start: how many HTTP
-attempts the retry policy actually made is only known once the call is
+something `RequestInfo` doesn't know at the start: how many HTTP
+attempts the retry policy made is only known once the call is
 over.
 
 ## The hook opens before validation
@@ -113,13 +113,13 @@ if err := validateQuestions(questions); err != nil {
 ```
 
 `validateContent` and `validateQuestions` run after the span is already
-open, not before. The practical effect: a request that never reaches the
-network — a `Choice` question with zero labels, a `state` that fails a size
-check — still produces one `finish(RequestResult{Err: ...})` call, and an
-implementation like `otel`'s sees it as a span whose status is an error, on
-the same timeline as every other call. A tracing setup that only saw calls
-that got as far as sending bytes over HTTP would systematically undercount
-client-side validation failures — exactly the failures a caller most wants
+open, not before, so a request that never reaches the network (a `Choice`
+question with zero labels, a `state` that fails a size check) still
+produces one `finish(RequestResult{Err: ...})` call, and an implementation
+like `otel`'s sees it as a span whose status is an error, on the same
+timeline as every other call. A tracing setup that only saw calls that got
+as far as sending bytes over HTTP would systematically undercount
+client-side validation failures: exactly the failures a caller most wants
 visibility into while integrating against the API for the first time.
 
 ## The hook still fires on panics
@@ -139,28 +139,28 @@ func (c *Client) startInstrument(ctx context.Context, info RequestInfo) (context
 }
 ```
 
-That `sync.Once` is what makes the panic-recovery pattern safe: if a panic
+That `sync.Once` makes the panic-recovery pattern safe: if a panic
 happens after the normal error-handling `finish(...)` calls further down in
 `SystemOne`, the deferred recovery's own `finish(...)` call is a no-op,
 because `done` already ran. If a panic happens before any of those calls,
 the deferred recovery is the only one that runs. Either way exactly one
 `RequestResult` reaches the instrumentation, and the panic itself is
 re-raised (`panic(r)`) after `finish` returns, so recovering here never
-swallows the panic — it only guarantees the span or metric that was already
+swallows the panic; it only guarantees the span or metric that was already
 open gets closed out before the panic continues to unwind.
 
 ## How `otel` implements it
 
 `otel.New()` returns a `typesafe.Instrumentation`. Its `RequestStart` opens
-a span named `"typesafe." + info.Operation` — `typesafe.system_one` or
-`typesafe.list_models` — with `trace.WithSpanKind(trace.SpanKindClient)` and
+a span named `"typesafe." + info.Operation` (`typesafe.system_one` or
+`typesafe.list_models`) with `trace.WithSpanKind(trace.SpanKindClient)` and
 a set of attributes drawn straight from `RequestInfo`: `AttrProviderName`
 and `AttrSystem` (both the literal `"typesafe"`), `AttrOperationName`,
 `AttrRequestModel`, and, for `system_one` calls,
 `AttrQuestionCount`/`AttrNoulCount`/`AttrChoiceCount`/`AttrScoreCount`. If
 `WithRecordContent` was configured with a positive byte limit and the span
-is actually recording, `AttrState` and `AttrQuestions` are added too — the
-one place this implementation reaches into the content fields
+is recording, `AttrState` and `AttrQuestions` are added too. This
+is the one place the implementation reaches into the content fields
 `RequestInfo` otherwise carries past unused.
 
 The returned closure fills in the rest from `RequestResult` at span end:
@@ -169,29 +169,29 @@ The returned closure fills in the rest from `RequestResult` at span end:
 `span.RecordError`, an error span status, and `AttrErrorType` (the error's Go
 type name). `WithRecordAnswers` adds one more layer, walking
 `RequestResult.Response.Answers` to set a `typesafe.answer.<key>.<field>`
-attribute per answer — also off by default, for the same reason `state` and
+attribute per answer, also off by default, for the same reason `state` and
 `questions` are.
 
 `Transport` is the other half: it wraps whatever `http.RoundTripper` the
 client would otherwise use with `otelhttp.NewTransport`, so every HTTP
 attempt the retry policy makes becomes its own child span, nested under the
 operation span `RequestStart` opened. A call that retries twice produces one
-`typesafe.system_one` span with three HTTP child spans underneath it — the
+`typesafe.system_one` span with three HTTP child spans underneath it: the
 operation-level view and the per-attempt view both exist, at their natural
 granularity.
 
 ## A different implementation: metrics or logs
 
 Nothing about `Instrumentation` is span-shaped. A metrics-only
-implementation could ignore spans entirely and just increment a counter and
-record a histogram observation inside the closure `RequestStart` returns —
+implementation could ignore spans entirely and increment a counter and
+record a histogram observation inside the closure `RequestStart` returns:
 `typesafe_requests_total{operation,status}` on every call,
 `typesafe_request_duration_seconds` from a `time.Since` captured at the top
 of `RequestStart`, using exactly the same `RequestInfo`/`RequestResult`
-fields the `otel` package reads, just written to a different backend. A
+fields the `otel` package reads, written to a different backend. A
 logging-only implementation could be simpler still: one structured log line
 per call, written from the closure, with `Operation`, `Model`, `Attempts`,
-`Status`, and `Err` as fields — no span, no context propagation, nothing
+`Status`, and `Err` as fields, no span, no context propagation, nothing
 tracing-specific at all. The interface only asks for "something happened,
 here's what" at the start and "here's how it ended" at the end; what an
 implementation does with that is entirely its own concern.

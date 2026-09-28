@@ -8,7 +8,7 @@ Go client for the [TypeSafe](https://typesafe.ai) System One API, plus the `jev`
 go get github.com/therealbill/typesafe-go
 ```
 
-Prebuilt `jev` binaries for macOS and Linux are attached to each [release](https://github.com/therealbill/typesafe-go/releases). Or `make build` to produce `bin/jev`.
+Each [release](https://github.com/therealbill/typesafe-go/releases) includes prebuilt `jev` binaries for macOS and Linux. Or run `make build` to produce `bin/jev`.
 
 ## Library
 

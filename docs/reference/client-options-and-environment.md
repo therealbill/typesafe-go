@@ -17,10 +17,9 @@ type Client struct {
 }
 ```
 
-Client calls the TypeSafe API. It is safe for concurrent use. The zero value
-is not usable; build one with `NewClient`. Because a `Client` is safe for
-concurrent use, one `Client` should be built and shared across goroutines
-rather than constructed per call or per request.
+Client calls the TypeSafe API and is safe for concurrent use. The zero value
+is not usable; build one with `NewClient` and share it across goroutines
+instead of constructing one per call or per request.
 
 ### NewClient
 
@@ -76,7 +75,7 @@ func (c *Client) LogValue() slog.Value
 
 LogValue describes the client without its API key, so the key cannot reach a
 log through `slog`. Returns `slog.GroupValue(slog.String("base_url", ...),
-slog.String("model", ...))` — only those two string attributes, never the API
+slog.String("model", ...))`, only those two string attributes, never the API
 key.
 
 ## Configuration resolution order
@@ -86,7 +85,7 @@ environment, which wins over these defaults.
 
 | Setting | 1. Option | 2. Environment variable | 3. Default |
 |---|---|---|---|
-| API key | `WithAPIKey` | `TYPESAFE_API_KEY` | none — `NewClient` returns `ErrMissingAPIKey` if neither is set. An empty or whitespace-only value from either the option or the environment variable is treated as not-set and falls through to the next source. |
+| API key | `WithAPIKey` | `TYPESAFE_API_KEY` | none. `NewClient` returns `ErrMissingAPIKey` if neither is set. An empty or whitespace-only value from either the option or the environment variable is treated as not-set and falls through to the next source. |
 | Base URL | `WithBaseURL` | `TYPESAFE_BASE_URL` | `DefaultBaseURL` (`https://api.typesafe.ai`) |
 | Model | `WithModel` | `TYPESAFE_DEFAULT_MODEL` | `DefaultModel` (`jev-latest`) |
 | Logger | `WithLogger` (sets a `*slog.Logger` directly) | `TYPESAFE_LOG_LEVEL` (selects a text logger on stderr: `debug`, `info`, `warning`/`warn`, `error`) | no logging (any other value, including `off` and unset) |
@@ -129,7 +128,7 @@ Option configures a Client.
 | Function | Signature | Description |
 |---|---|---|
 | `WithAPIKey` | `func WithAPIKey(key string) Option` | Sets the API key, ignoring surrounding whitespace. Otherwise `TYPESAFE_API_KEY` is used. An empty or whitespace-only key is treated as unset and the environment is consulted. |
-| `WithBaseURL` | `func WithBaseURL(u string) Option` | Sets the API root, for example for a gateway. Otherwise `TYPESAFE_BASE_URL` or `https://api.typesafe.ai` is used. Validated by `normalizeBaseURL` — see [Base URL validation](#base-url-validation) below. |
+| `WithBaseURL` | `func WithBaseURL(u string) Option` | Sets the API root, for example for a gateway. Otherwise `TYPESAFE_BASE_URL` or `https://api.typesafe.ai` is used. Validated by `normalizeBaseURL`; see [Base URL validation](#base-url-validation) below. |
 | `WithModel` | `func WithModel(m string) Option` | Sets the default model. Otherwise `TYPESAFE_DEFAULT_MODEL` or `jev-latest` is used. |
 | `WithRetryPolicy` | `func WithRetryPolicy(p RetryPolicy) Option` | Replaces the default retry policy. |
 | `WithTimeout` | `func WithTimeout(d time.Duration) Option` | Sets the timeout for each HTTP attempt. Default 10s. Zero disables the per-attempt timeout. A negative duration returns an error immediately (`typesafe: timeout must not be negative`). |
@@ -178,7 +177,7 @@ recorded.
 | `WithRequestRetry` | `func WithRequestRetry(p RetryPolicy) RequestOption` | Overrides the retry policy for this call. |
 | `WithRequestTimeout` | `func WithRequestTimeout(d time.Duration) RequestOption` | Overrides the per-attempt timeout for this call. Zero disables the per-attempt timeout. A negative duration returns `&typesafe.ValidationError{Path: "timeout", Err: errors.New("timeout must not be negative")}` immediately, before any network call. |
 | `WithExtraHeaders` | `func WithExtraHeaders(h http.Header) RequestOption` | Adds headers to this call, replacing client headers with the same name. As with `WithHeaders`, an `Authorization` header given here replaces the API key header. The `http.Header` is cloned when this option is constructed, not when it is applied, so a caller that mutates its header value afterward cannot change the call. |
-| `WithExtraBody` | `func WithExtraBody(fields map[string]any) RequestOption` | Merges fields into the top level of the request body. Use it for API fields this package does not model yet. The map is copied when this option is constructed, not when it is applied. The keys the client sets itself — `state`, `model`, `questions` — are rejected if present, with `&typesafe.ValidationError{Path: "extra_body.<key>", Err: errors.New("field is set by the client and must not be overridden")}`. |
+| `WithExtraBody` | `func WithExtraBody(fields map[string]any) RequestOption` | Merges fields into the top level of the request body. Use it for API fields this package does not model yet. The map is copied when this option is constructed, not when it is applied. The keys the client sets itself (`state`, `model`, `questions`) are rejected if present, with `&typesafe.ValidationError{Path: "extra_body.<key>", Err: errors.New("field is set by the client and must not be overridden")}`. |
 
 ## NewLogger
 

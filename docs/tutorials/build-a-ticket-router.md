@@ -30,9 +30,9 @@ A command-line Go program that:
 
 Every command below is one you actually run. The checkpoints show real
 output captured from the live API. TypeSafe's judgments come from a model,
-not a lookup table, so if you run these programs yourself, your
-probabilities, confidence values, and scores will land close to what's shown
-here but will rarely match to the decimal — that's expected, not a bug.
+not a lookup table. If you run these programs yourself, expect your
+probabilities, confidence values, and scores to land close to what's shown
+here, though they will rarely match to the decimal.
 
 ## Prerequisites
 
@@ -43,8 +43,8 @@ This tutorial assumes you're comfortable with the basics: sending `state`,
 defining questions, and reading typed answers back with `Nouls()`,
 `Choices()`, and `Scores()`. If any of that is unfamiliar, the
 [question types](../reference/question-types.md) and
-[response types](../reference/response-types.md) references cover it —
-nothing here requires having followed another tutorial first.
+[response types](../reference/response-types.md) references cover it.
+Nothing here requires having followed another tutorial first.
 
 ## Step 1: Set up a module and install the library
 
@@ -145,22 +145,21 @@ func main() {
 }
 ```
 
-A few things worth naming before you run it:
+Before you run it:
 
 - All four questions go out in one `Questions` map, so this is one HTTP call
   to `/v1/systemone`, not four. The identifiers (`"billing"`, `"department"`,
-  `"urgency"`, `"needs_human"`) are yours to choose — they're how you find
+  `"urgency"`, `"needs_human"`) are yours to choose. They're how you find
   each answer afterward, and the model never sees them.
 - `department` is a `Choice` with four labels, and one of them, `"none"`, maps
-  to `nil` instead of a description. A `nil` value in `Choice.Criteria` means
-  "leave this label undescribed" rather than "remove this label" — the model
-  can still pick `none`, it just isn't told what `none` means beyond its
-  name. That gives the model an explicit way to say "this ticket doesn't fit
-  any real department" instead of forcing a bad fit onto `billing`,
-  `technical`, or `account`.
-- `needs_human` is a second `Noul`, independent of `billing`. Nothing stops a
-  single call from asking more than one probability question — you're not
-  limited to one judgment per question type.
+  to `nil` instead of a description. A `nil` value in `Choice.Criteria` leaves
+  a label undescribed; it does not remove the label. The model can still pick
+  `none`, but isn't told what `none` means beyond its name. That gives the
+  model an explicit way to say "this ticket doesn't fit any real department"
+  instead of forcing a bad fit onto `billing`, `technical`, or `account`.
+- `needs_human` is a second `Noul`, independent of `billing`. A single call
+  can ask more than one probability question; you're not limited to one
+  judgment per question type.
 
 Run it:
 
@@ -179,17 +178,16 @@ urgency:     0.97
 needs_human: 0.58
 ```
 
-Four independent answers from one call: `billing` is almost certainly about
-billing, the model picked the `billing` department with full confidence,
-`urgency` sits low on the 0–2 rubric, and `needs_human` landed near the
-middle — this particular ticket doesn't obviously need a person, but it's not
-a clear no either.
+Four independent answers came from one call: `billing` is almost certainly
+about billing, the model picked the `billing` department with full
+confidence, `urgency` sits low on the 0–2 rubric, and `needs_human` landed
+near the middle. This ticket doesn't obviously need a person, but it isn't a
+clear no either.
 
 ## Step 3: Turn the answers into a routing decision
 
-Reading four answers is only half the job — the point of asking them
-together is to make one decision from all four at once. Replace the body of
-`main.go`:
+Reading four answers is only half the job. Asking them together supports
+making one decision from all four at once. Replace the body of `main.go`:
 
 ```go
 package main
@@ -285,7 +283,7 @@ func route(needsHuman, urgency float64, department typesafe.ChoiceAnswer) string
 
 1. If `needs_human` is above `0.6`, or `urgency` is above `1.5` (past
    "somewhat urgent" and leaning toward "very urgent" on the 0–2 rubric), the
-   ticket goes to a human queue outright — either the model flagged it
+   ticket goes to a human queue outright. Either the model flagged it
    directly, or it's urgent enough that an automated reply is a risk.
 2. Otherwise, if the `department` choice's `Confidence` is below `0.6`, the
    ticket still goes to the human queue. A department pick the model isn't
@@ -312,14 +310,14 @@ route:       billing
 ```
 
 This was a fresh call, which is why `urgency` reads `0.96` here instead of
-Step 2's `0.97` — each call is an independent judgment, as noted above. All
+Step 2's `0.97`. Each call is an independent judgment, as noted above. All
 three of `route`'s checks pass this ticket through: `needs_human` (`0.58`) is
 under `0.6`, `urgency` (`0.96`) is under `1.5`, and `department`'s confidence
-(`1.00`) is well over `0.6`, so it lands on `billing`.
+(`1.00`) is comfortably over `0.6`, so it lands on `billing`.
 
 ## Step 4: Route more than one ticket
 
-One ticket routing correctly doesn't prove much — the interesting part is
+One ticket routing correctly doesn't prove much. The interesting part is
 seeing `route` take different paths. Replace `main.go` once more to loop over
 three tickets chosen to land differently: a clear billing complaint, an
 angry and urgent one, and a calm but ambiguous one.
@@ -465,42 +463,42 @@ needs_human: 0.38
 route:       human queue (department pick too uncertain)
 ```
 
-Three tickets, three different paths through `route`:
+The three tickets take different paths through `route`:
 
 - The first ticket repeats Step 3's result: low `needs_human`, low `urgency`,
   high department confidence, so it routes straight to `billing`.
-- The second ticket trips the first check two ways at once — `needs_human`
-  (`0.88`) is well above `0.6`, and `urgency` (`2.00`) is pinned at the top of
+- The second ticket trips the first check two ways at once. `needs_human`
+  (`0.88`) is clearly above `0.6`, and `urgency` (`2.00`) is pinned at the top of
   the rubric. Either one alone would have sent it to the human queue; here
   both do.
-- The third ticket is calm and not urgent — `urgency` is `0.00` and
-  `needs_human` is `0.38`, comfortably under threshold — but it mentions both
+- The third ticket is calm and not urgent: `urgency` is `0.00` and
+  `needs_human` is `0.38`, comfortably under threshold. But it mentions both
   a payment method and a profile setting, so the model split its confidence
   across `account` and `billing`. `department`'s confidence (`0.58`) falls
-  just under `0.6`, and the third check catches it: a low-confidence
+  just under `0.6`, so the third check catches it: a low-confidence
   department pick goes to the human queue even though nothing else about the
   ticket looked risky.
 
-That third case is the one worth sitting with: `department.Choice` still
-holds a value (`account`) even though `route` didn't use it. A `Choice`
-answer always names a label — checking `Confidence` alongside it is what
-tells you whether that label is worth acting on.
+In the third case, `department.Choice` still holds a value (`account`) even
+though `route` didn't use it. A `Choice` answer always names a label.
+Checking `Confidence` alongside it tells you whether that label is worth
+acting on.
 
 ## What you built
 
 You now have a Go program that asks four independent questions about a
-support ticket in a single call — a probability, a choice with an
+support ticket in a single call (a probability, a choice with an
 explicit "none of the above" label, an urgency rubric, and a second,
-speculative probability — and combines all four into a routing decision,
+speculative probability) and combines all four into a routing decision,
 including the case where the right department can't be picked with enough
 confidence to trust automatically.
 
 ## Next steps
 
-- **Act on the numbers, not just the labels**: see
+- **Act on the numbers behind the labels**: see
   [Act on probabilities and confidence](../how-to/act-on-probabilities-and-confidence.md)
   for a task-focused look at thresholds, confidence, and probability
-  distributions — including TypeSafe's own guidance on interpreting
+  distributions, including TypeSafe's own guidance on interpreting
   confidence, at [docs.typesafe.ai/confidence](https://docs.typesafe.ai/confidence).
 - **Decode answers into your own struct**: see
   [Decode answers into your own struct](../how-to/decode-answers-into-your-own-struct.md).

@@ -109,7 +109,7 @@ in `otel/otel.go` sets the start-of-span attributes from the
 |---|---|---|---|---|
 | `AttrProviderName` | `gen_ai.provider.name` | `typesafe.system_one`, `typesafe.list_models` | Always, at span start. | Literal `ProviderName` (`"typesafe"`). |
 | `AttrSystem` | `gen_ai.system` | `typesafe.system_one`, `typesafe.list_models` | Always, at span start. | Literal `ProviderName` (`"typesafe"`). |
-| `AttrOperationName` | `gen_ai.operation.name` | `typesafe.system_one`, `typesafe.list_models` | Always, at span start. | `RequestInfo.Operation` — the same string (`"system_one"` or `"list_models"`) used to build the span name `"typesafe." + info.Operation`. |
+| `AttrOperationName` | `gen_ai.operation.name` | `typesafe.system_one`, `typesafe.list_models` | Always, at span start. | `RequestInfo.Operation`, the same string (`"system_one"` or `"list_models"`) used to build the span name `"typesafe." + info.Operation`. |
 | `AttrRequestModel` | `gen_ai.request.model` | `typesafe.system_one`, `typesafe.list_models` | Always, at span start. | `RequestInfo.Model`. |
 | `AttrQuestionCount` | `typesafe.questions.count` | `typesafe.system_one` only | At span start, only when `RequestInfo.Operation == "system_one"`. | `RequestInfo.QuestionCount`. |
 | `AttrNoulCount` | `typesafe.questions.noul` | `typesafe.system_one` only | At span start, only when `RequestInfo.Operation == "system_one"`. | `RequestInfo.NoulCount`. |
@@ -126,7 +126,7 @@ in `otel/otel.go` sets the start-of-span attributes from the
 | `AttrErrorType` | `error.type` | `typesafe.system_one`, `typesafe.list_models` | At span end, only when `RequestResult.Err != nil`. | The Go type name of `RequestResult.Err`, with a leading `*` trimmed (for example `typesafe.APIError`). The span also records the error and sets its status to `codes.Error` with `RequestResult.Err.Error()`. |
 
 `RequestStart` only marshals `RequestInfo.State`/`RequestInfo.Questions` to
-JSON when the span will actually use the result: the check is
+JSON when the span will use the result: the check is
 `if info.Operation == "system_one" && i.contentBytes > 0 && span.IsRecording()`.
 When `span.IsRecording()` is false (for example, a sampler decided not to
 record this trace), the marshaling is skipped entirely and neither attribute
@@ -150,7 +150,7 @@ added at span end, in ascending key order:
 | Answer type | Attributes set |
 |---|---|
 | `typesafe.NoulAnswer` | `typesafe.answer.<key>.noul` (float64) |
-| `typesafe.ChoiceAnswer` | `typesafe.answer.<key>.choice` (string, capped — see below), `typesafe.answer.<key>.confidence` (float64) |
+| `typesafe.ChoiceAnswer` | `typesafe.answer.<key>.choice` (string, capped; see below), `typesafe.answer.<key>.confidence` (float64) |
 | `typesafe.ScoreAnswer` | `typesafe.answer.<key>.score` (float64), `typesafe.answer.<key>.confidence` (float64) |
 
 `typesafe.UnknownAnswer` values do not produce answer attributes. These keys
@@ -162,7 +162,7 @@ same rune-safe helper used for `AttrState`/`AttrQuestions`) to at most
 `maxAnswerChoiceBytes` (`= 256`) bytes before being set as the
 `typesafe.answer.<key>.choice` attribute, bounding how much a pathologically
 long label can bloat a span. Unlike `AttrState`/`AttrQuestions`, this cut
-does not append the `...(truncated)` marker — the value is cut cleanly with
-no suffix, since it's a discrete label field rather than JSON content.
+does not append the `...(truncated)` marker. The value is cut cleanly with
+no suffix, since it is a discrete label field rather than JSON content.
 `Noul` and `Score` values are numeric and are not truncated; only the
 `.choice` string attribute is capped.

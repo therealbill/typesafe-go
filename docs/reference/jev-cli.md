@@ -56,7 +56,7 @@ version` subcommand are different things that happen to share the word
 | Output | One line: `jev version <string>` | A JSON object: `{"version":...,"commit":...,"go":...}` |
 | Exit code | 0 | 0 |
 
-The `<string>` is `internal/version.Version` — the same build-time value
+The `<string>` is `internal/version.Version`, the same build-time value
 reported by the `version` field of the `jev version` subcommand (see below).
 Verified against the built binary:
 
@@ -74,22 +74,22 @@ These are persistent flags (Cobra `PersistentFlags`, defined in `internal/cli/ro
 | `--api-key` | string | `""` | `TYPESAFE_API_KEY` | TypeSafe API key (env TYPESAFE_API_KEY) |
 | `--base-url` | string | `""` | `TYPESAFE_BASE_URL` | API base URL (env TYPESAFE_BASE_URL) |
 | `--model` | string | `""` | `TYPESAFE_DEFAULT_MODEL` | model name (env TYPESAFE_DEFAULT_MODEL; default jev-latest) |
-| `--timeout` | duration | `0` | — | per-attempt HTTP timeout (default 10s) |
-| `--max-retries` | int | `2` | — | retries after the first attempt (default 2) |
+| `--timeout` | duration | `0` | none | per-attempt HTTP timeout (default 10s) |
+| `--max-retries` | int | `2` | none | retries after the first attempt (default 2) |
 | `--log-level` | string | `""` | `TYPESAFE_LOG_LEVEL` | debug\|info\|warning\|error\|off (env TYPESAFE_LOG_LEVEL) |
-| `--trace` | bool | `false` | — | force OpenTelemetry tracing on |
-| `--no-trace` | bool | `false` | — | disable tracing even when HONEYCOMB_API_KEY or OTEL_* is set |
-| `--pretty` | bool | `false` | — | indent JSON output |
-| `-h`, `--help` | bool | `false` | — | help for jev |
+| `--trace` | bool | `false` | none | force OpenTelemetry tracing on |
+| `--no-trace` | bool | `false` | none | disable tracing even when HONEYCOMB_API_KEY or OTEL_* is set |
+| `--pretty` | bool | `false` | none | indent JSON output |
+| `-h`, `--help` | bool | `false` | none | help for jev |
 
-`clientOptions` (`internal/cli/root.go`) turns `globals` fields into `typesafe.Option` values. Whether a flag was explicitly passed is tracked with `cmd.Flags().Changed("<name>")`, not by any sentinel value. A flag not explicitly passed is omitted from the options, letting the `typesafe` package's own default (env var, then package default — see the [client options and environment reference](./client-options-and-environment.md)) apply unmodified.
+`clientOptions` (`internal/cli/root.go`) turns `globals` fields into `typesafe.Option` values. Whether a flag was explicitly passed is tracked with `cmd.Flags().Changed("<name>")`, not by any sentinel value. A flag not explicitly passed is omitted from the options, letting the `typesafe` package's own default (env var, then package default; see the [client options and environment reference](./client-options-and-environment.md)) apply unmodified.
 
 ### `--max-retries`
 
-The flag's Cobra default is `2` (`pf.IntVar(&g.maxRetries, "max-retries", 2, "retries after the first attempt")`) — the same value the library's own `DefaultRetryPolicy()` uses, and there is no sentinel value. Whether `--max-retries` was explicitly passed is tracked via `cmd.Flags().Changed("max-retries")`:
+The flag's Cobra default is `2` (`pf.IntVar(&g.maxRetries, "max-retries", 2, "retries after the first attempt")`). This is the same value the library's own `DefaultRetryPolicy()` uses, and there is no sentinel value. Whether `--max-retries` was explicitly passed is tracked via `cmd.Flags().Changed("max-retries")`:
 
 - Not passed: `clientOptions` does not call `typesafe.WithRetryPolicy` at all. The client's own configured policy (or `typesafe.DefaultRetryPolicy()`) applies as-is.
-- Passed (including `--max-retries 2`, matching the default): `clientOptions` calls `p := typesafe.DefaultRetryPolicy(); p.MaxRetries = g.maxRetries; typesafe.WithRetryPolicy(p)` — every other `RetryPolicy` field still comes from `DefaultRetryPolicy()`.
+- Passed (including `--max-retries 2`, matching the default): `clientOptions` calls `p := typesafe.DefaultRetryPolicy(); p.MaxRetries = g.maxRetries; typesafe.WithRetryPolicy(p)`. Every other `RetryPolicy` field still comes from `DefaultRetryPolicy()`.
 
 `--max-retries 2` and omitting the flag are practically indistinguishable in
 effect (both end up at `MaxRetries: 2` with default everything else), but
@@ -212,12 +212,12 @@ Used when `-f` is given, or when `-f` is empty/omitted and no question flags are
 Parsing rules (`parseRequestJSON`, `internal/cli/request.go`):
 
 - `state` is required (error: `invalid request: "state" is required`).
-- `questions` is required (error: `invalid request: "questions" is required`); each entry must be a JSON object with a string `type` field (error otherwise: `invalid request: questions.<id>: must be an object with a "type"`, or `invalid request: questions.<id>.type: is required`). `type` of `"noul"`, `"choice"`, or `"score"` is decoded, with a strict decoder (`json.NewDecoder(...).DisallowUnknownFields()`), into `typesafe.Noul`, `typesafe.Choice`, or `typesafe.Score` respectively — an unrecognized field inside that question object is rejected, naming the field: `invalid request: questions.<id>: json: unknown field "<field>"`. Strictness is nested: an unrecognized field inside a nested object (for example a `noul` question's `criteria`, which accepts only `true` and `false`) is rejected the same way. Any other `type` value is decoded into a `typesafe.RawQuestion` (passed through unmodeled with a plain `json.Unmarshal`, so it is not subject to the strict decoder — a forward-compatible question type accepts any fields).
+- `questions` is required (error: `invalid request: "questions" is required`); each entry must be a JSON object with a string `type` field (error otherwise: `invalid request: questions.<id>: must be an object with a "type"`, or `invalid request: questions.<id>.type: is required`). `type` of `"noul"`, `"choice"`, or `"score"` is decoded, with a strict decoder (`json.NewDecoder(...).DisallowUnknownFields()`), into `typesafe.Noul`, `typesafe.Choice`, or `typesafe.Score` respectively. An unrecognized field inside that question object is rejected, naming the field: `invalid request: questions.<id>: json: unknown field "<field>"`. Strictness is nested: an unrecognized field inside a nested object (for example a `noul` question's `criteria`, which accepts only `true` and `false`) is rejected the same way. Any other `type` value is decoded into a `typesafe.RawQuestion` (passed through unmodeled with a plain `json.Unmarshal`, so it is not subject to the strict decoder; a forward-compatible question type accepts any fields).
 - `model` is optional and, if present, becomes the request's model (see Model selection, below).
 - Any other top-level field is collected and sent via `typesafe.WithExtraBody`.
 - An empty document (after trimming whitespace) is an error: `no request given: pass --file, pipe JSON to stdin, or use --state with --noul/--choice/--score`.
 - Malformed JSON is reported as `invalid request JSON: <json error>` (top-level) or `invalid request: <field>: <json error>` (per-field).
-- Reading stdin, `-f <path>`, or `--state @path` refuses input over 16 MiB — see [Input size limit](#input-size-limit) above.
+- Reading stdin, `-f <path>`, or `--state @path` refuses input over 16 MiB. See [Input size limit](#input-size-limit) above.
 
 Verified against the built binary:
 
@@ -251,8 +251,8 @@ Used when any of `--state`, `--noul`, `--choice`, `--score` is set (`requestFrom
 - `--state` value resolution: `-` reads state from stdin; a value starting with `@` reads the remainder as a file path (both subject to the [16 MiB input limit](#input-size-limit)); any other value is used literally as text.
 - Every `--noul`/`--choice`/`--score` value is first split on the first `=` into a key and a remainder (`splitKV`). A missing or leading `=` is an error: `<flag> "<value>": expected key=instructions`. Otherwise, the key must be non-blank after trimming whitespace, or it is an error: `<flag> "<value>": question key must not be blank`.
 - `--noul key=instructions`: the remainder after `key=` is used directly as `Instructions`. Produces `typesafe.Noul{Instructions: instructions}` with no criteria.
-- `--choice key=instructions:label1,label2,...` and `--score key=instructions:level0|level1|...`: the remainder after `key=` is split on its **last** `:` (`strings.LastIndex`, in `splitInstrLabels`) into instructions and a label/level list, which is then split on `,` (`--choice`) or `|` (`--score`). Splitting on the last `:` — not the first — lets `instructions` itself contain colons, for example `--choice tone="What time is it: morning or evening?:calm,angry"` parses instructions as `"What time is it: morning or evening?"` and labels as `calm,angry`. A missing `:` is an error: `<flag> "<value>": expected key=instructions:labels`; an empty label/level (after trimming) is an error: `<flag> "<value>": empty label`.
-- There is no character-forbidding validation on a label or level: since the split point is always the *last* `:` in the whole value, a label or level occurring after that point must not itself contain a `:`, or that colon is mistaken for the split point (shifting where instructions ends). For example, `--choice 'tone=What tone?:calm,an:gry'` splits on the last `:` (the one inside `an:gry`), producing `Instructions: "What tone?:calm,an"` and a single label `"gry"` — `calm` silently disappears into the instructions text rather than being rejected. Likewise a `--choice` label containing `,`, or a `--score` level containing `|`, is not rejected — it is mechanically split into multiple labels/levels at that separator, the same as any other occurrence of it. None of these cases produce a validation error message; each is a parsing consequence of where the splits land, matching the `--help` text above (`labels must not contain ':' or ','`, `levels must not contain ':' or '|'`).
+- `--choice key=instructions:label1,label2,...` and `--score key=instructions:level0|level1|...`: the remainder after `key=` is split on its **last** `:` (`strings.LastIndex`, in `splitInstrLabels`) into instructions and a label/level list, which is then split on `,` (`--choice`) or `|` (`--score`). Splitting on the last `:` (not the first) allows `instructions` itself to contain colons, for example `--choice tone="What time is it: morning or evening?:calm,angry"` parses instructions as `"What time is it: morning or evening?"` and labels as `calm,angry`. A missing `:` is an error: `<flag> "<value>": expected key=instructions:labels`; an empty label/level (after trimming) is an error: `<flag> "<value>": empty label`.
+- There is no character-forbidding validation on a label or level: since the split point is always the *last* `:` in the whole value, a label or level occurring after that point must not itself contain a `:`, or that colon is mistaken for the split point (shifting where instructions ends). For example, `--choice 'tone=What tone?:calm,an:gry'` splits on the last `:` (the one inside `an:gry`), producing `Instructions: "What tone?:calm,an"` and a single label `"gry"`. `calm` silently disappears into the instructions text rather than being rejected. Likewise a `--choice` label containing `,`, or a `--score` level containing `|`, is not rejected. It is mechanically split into multiple labels/levels at that separator, the same as any other occurrence of it. None of these cases produce a validation error message; each is a parsing consequence of where the splits land, matching the `--help` text above (`labels must not contain ':' or ','`, `levels must not contain ':' or '|'`).
 - `--score` additionally requires at least two levels (error: `--score "<value>": needs at least two levels separated by |`). Produces `typesafe.Choice{Instructions: instructions, Criteria: {label: nil, ...}}` for `--choice`, `typesafe.Score{Instructions: instructions, Criteria: [level0, level1, ...]}` for `--score`.
 - A question key repeated across `--noul`/`--choice`/`--score` is an error: `duplicate question key "<key>"`.
 
@@ -267,7 +267,7 @@ $ ./bin/jev ask --state "just text"
 
 ### `--raw`
 
-Without `--raw`, `jev ask` writes its own JSON encoding of the decoded `*typesafe.SystemOneResponse` via the shared `writeJSON` helper (honoring `--pretty`). With `--raw`, it writes `res.Raw.Body` — the server's response bytes, unchanged — followed by a trailing newline; `--pretty` has no effect on `--raw` output.
+Without `--raw`, `jev ask` writes its own JSON encoding of the decoded `*typesafe.SystemOneResponse` via the shared `writeJSON` helper (honoring `--pretty`). With `--raw`, it writes `res.Raw.Body` (the server's response bytes, unchanged), followed by a trailing newline; `--pretty` has no effect on `--raw` output.
 
 ### Output shape (non-`--raw`)
 
@@ -384,14 +384,14 @@ Source: `internal/cli/telemetry.go`.
 
 | `OTEL_CONFIG_FILE` | Behavior |
 |---|---|
-| Set (non-empty) | The named file's bytes are read, then `${VAR}`-expanded against the environment via `os.Expand`, then parsed as OpenTelemetry YAML configuration via `otelconf.ParseYAML`. The parsed configuration is used directly — `HONEYCOMB_API_KEY`, `OTEL_EXPORTER_OTLP_ENDPOINT`, and `OTEL_SERVICE_NAME` are not consulted. |
+| Set (non-empty) | The named file's bytes are read, then `${VAR}`-expanded against the environment via `os.Expand`, then parsed as OpenTelemetry YAML configuration via `otelconf.ParseYAML`. The parsed configuration is used directly. `HONEYCOMB_API_KEY`, `OTEL_EXPORTER_OTLP_ENDPOINT`, and `OTEL_SERVICE_NAME` are not consulted. |
 | Unset | A configuration is built from `HONEYCOMB_API_KEY`, `OTEL_EXPORTER_OTLP_ENDPOINT`, and `OTEL_SERVICE_NAME` (below), via `buildTelemetryConfig`. |
 
 ### Built configuration (no `OTEL_CONFIG_FILE`)
 
 | Environment variable | Default when unset | Effect |
 |---|---|---|
-| `HONEYCOMB_API_KEY` | — | When non-empty, added as an `x-honeycomb-team` HTTP header on the OTLP exporter. |
+| `HONEYCOMB_API_KEY` | none | When non-empty, added as an `x-honeycomb-team` HTTP header on the OTLP exporter. |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | `https://api.honeycomb.io` | A trailing `/` is trimmed; `/v1/traces` is appended if the (trimmed) value does not already end with it. |
 | `OTEL_SERVICE_NAME` | `jev` | Set as the `service.name` resource attribute. |
 
@@ -399,7 +399,7 @@ The resulting configuration (`buildTelemetryConfig`) is `FileFormat: "1.0"` with
 
 ### Failure handling
 
-A telemetry setup failure — reading or parsing `OTEL_CONFIG_FILE`, or SDK construction — is reported on stderr as:
+A telemetry setup failure (reading or parsing `OTEL_CONFIG_FILE`, or SDK construction) is reported on stderr as:
 
 ```
 jev: tracing disabled: <error>
@@ -425,4 +425,4 @@ jev: tracing shutdown: <error>
 | 7 | `ExitConnection` | Connection failure or timeout. |
 | 130 | `ExitInterrupted` | The context was cancelled, conventionally by SIGINT. |
 
-The full error-type-to-exit-code classification and the error JSON shape written to stdout on failure — including the `"usage"` versus `"internal"` split at code 1 and the `"interrupted"` case at code 130 — are documented on the [errors and exit codes reference](./errors-and-exit-codes.md).
+The full error-type-to-exit-code classification and the error JSON shape written to stdout on failure (including the `"usage"` versus `"internal"` split at code 1 and the `"interrupted"` case at code 130) are documented on the [errors and exit codes reference](./errors-and-exit-codes.md).

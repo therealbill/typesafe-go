@@ -13,5 +13,5 @@ the [Diátaxis](https://diataxis.fr) model, so each page has one job:
 | **Learning** | [Tutorials](tutorials/_index.md): lessons that take you from nothing to a working result | [Explanation](explanation/_index.md): why the library is shaped the way it is |
 | **Working** | [How-to guides](how-to/_index.md): recipes for a task you already understand | [Reference](reference/_index.md): facts about every option, type, flag, and exit code |
 
-New here? Start with [Your first judgment in Go](tutorials/first-judgment-in-go.md).
-Looking for a specific option or flag? Go straight to the reference.
+If this is new to you, start with [Your first judgment in Go](tutorials/first-judgment-in-go.md).
+For a specific option or flag, go straight to the reference.

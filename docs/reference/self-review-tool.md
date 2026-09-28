@@ -79,7 +79,7 @@ type unit struct {
 | `implementation` | array of string | Yes | File paths whose contents are concatenated (each preceded by a `// file: <path>` header) into `state.implementation`. |
 | `tests` | array of string | Yes | File paths concatenated the same way into `state.tests`. |
 | `behaviors` | array of string | Yes | Behavior-description strings; each becomes one `covers_NN` question sent to Jev, in order. |
-| `accepted` | array of string | No | Question ids or behavior text whose flag is acknowledged and does not fail the run; see [Report JSON fields](#report-json-fields) below. An entry matching `^covers_\d+$` is rejected at load time (`validateUnits`) — coverage acceptances must name the behavior text itself, not its position, so renumbering `behaviors` cannot silently move an acceptance to a different claim. Every other entry must equal one of `behaviors`, or be `contradicts_spec` or `thoroughness`; an entry matching none of those is also rejected at load time. |
+| `accepted` | array of string | No | Question ids or behavior text whose flag is acknowledged and does not fail the run; see [Report JSON fields](#report-json-fields) below. An entry matching `^covers_\d+$` is rejected at load time (`validateUnits`). Coverage acceptances must name the behavior text itself, not its position, so renumbering `behaviors` cannot silently move an acceptance to a different claim. Every other entry must equal one of `behaviors`, or be `contradicts_spec` or `thoroughness`; an entry matching none of those is also rejected at load time. |
 | `notes` | array of string | No | Free-text rationale for the acceptances, copied into the report as `notes`. |
 
 The real `tools/selfreview/units.json` in this repository declares
@@ -193,7 +193,7 @@ type behaviorResult struct {
 | `notes` | array of string | omitempty | Copied from the unit's `notes` in `units.json`. |
 | `stale_acceptances` | array of string | omitempty | Entries from the unit's `accepted` list whose corresponding flag did not fire on this run, sorted. |
 | `failing` | bool | Always | True when at least one flag was recorded that was not accepted, or when the unit errored. |
-| `error` | string | omitempty | Set instead of the other fields (aside from `name` and `notes`) when the unit could not be run to completion — a missing source file, an unreadable spec heading, a `jev ask` process failure or timeout, or a response the tool could not parse. |
+| `error` | string | omitempty | Set instead of the other fields (aside from `name` and `notes`) when the unit could not be run to completion: a missing source file, an unreadable spec heading, a `jev ask` process failure or timeout, or a response the tool could not parse. |
 
 A `covers_NN` behavior flag is keyed in `accepted`/`flags`/`stale_acceptances`
 by the behavior's own text, not by `covers_NN`, so reordering `behaviors` in

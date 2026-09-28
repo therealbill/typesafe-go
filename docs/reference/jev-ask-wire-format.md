@@ -31,7 +31,7 @@ behavior are documented on the [jev CLI reference](jev-cli.md). Source:
 | `state` | Yes | any JSON value | Decoded into `req.State` (a Go `any`). `parseRequestJSON` requires the key to be present; if absent the error is `invalid request: "state" is required`. |
 | `questions` | Yes | object | Keyed by an arbitrary identifier string; each value is one question object (below). `parseRequestJSON` requires the key to be present; if absent the error is `invalid request: "questions" is required`. |
 | `model` | No | string | If present, becomes `req.Model`. A non-string value produces `invalid request: model: <json error>`. |
-| any other key | No | any JSON value | Collected into `req.Extra`, keyed by its own name, and — only when `req.Extra` is non-empty — passed to `typesafe.WithExtraBody(req.Extra)` when the request is sent. `parseRequestJSON` never puts `state`, `questions`, or `model` into `req.Extra`, so `WithExtraBody`'s own rejection of those three key names (see the [client options and environment reference](client-options-and-environment.md)) cannot be triggered through this path. |
+| any other key | No | any JSON value | Collected into `req.Extra`, keyed by its own name, and passed to `typesafe.WithExtraBody(req.Extra)` when the request is sent, but only when `req.Extra` is non-empty. `parseRequestJSON` never puts `state`, `questions`, or `model` into `req.Extra`, so `WithExtraBody`'s own rejection of those three key names (see the [client options and environment reference](client-options-and-environment.md)) cannot be triggered through this path. |
 
 `parseRequestJSON` decodes the top level into `map[string]json.RawMessage`
 before processing individual fields, so malformed top-level JSON is reported
@@ -50,26 +50,26 @@ nested objects such as a `noul` question's `criteria`); an unrecognized field
 anywhere in the object is rejected:
 `invalid request: questions.<id>: json: unknown field "<field>"`. Any other
 `type` value is decoded with a plain `json.Unmarshal` into a
-`typesafe.RawQuestion` (`map[string]any`) — a forward-compatible question
-type, not subject to the strict decoder, and passed through unchanged.
+`typesafe.RawQuestion` (`map[string]any`), a forward-compatible question
+type not subject to the strict decoder, passed through unchanged.
 
 Each parsed question is held as a `typesafe.Noul`, `typesafe.Choice`,
 `typesafe.Score`, or `typesafe.RawQuestion` value. Before the request is sent,
 the client library's `Client.SystemOne` re-encodes these values to JSON via
-each type's own `MarshalJSON` method — the bytes actually transmitted follow
+each type's own `MarshalJSON` method. The bytes transmitted follow
 the wire shapes below, which can differ from the original input bytes (for
 example, `criteria` appearing as an explicit JSON `null` when omitted from a
 `choice` or `score` question, because `json.Marshal` of a nil Go map or slice
 produces `null`, not `{}` or `[]`).
 
 `Client.SystemOne` also runs `validateQuestions` on the parsed `Questions` map
-immediately before the network call — after `jev ask`'s own JSON parsing has
-already succeeded, and after `Instrumentation.RequestStart` has been called.
+immediately before the network call, after `jev ask`'s own JSON parsing has
+already succeeded and after `Instrumentation.RequestStart` has been called.
 The per-type limits below (`choice` label count, `score` level count) are
 enforced there, as a `*typesafe.ValidationError`, not during
 `parseRequestJSON`/`parseQuestion` itself: a `choice` or `score` question
 whose `criteria` violates its limit parses without error and only fails once
-the request is actually sent.
+the request is sent.
 
 ### noul
 
@@ -99,7 +99,7 @@ object, or an array.
 
 `Noul.MarshalJSON` produces `{"type":"noul"}` plus `instructions` when
 non-nil, plus `criteria` when non-nil (itself containing `true`/`false` only
-when each is non-nil) — omitted fields are absent from the object rather than
+when each is non-nil). Omitted fields are absent from the object rather than
 present as `null`.
 
 ### choice
@@ -121,7 +121,7 @@ Input shape:
 to JSON `null` to leave it undescribed; `parseQuestion` accepts `criteria`
 being entirely absent (the resulting `typesafe.Choice` then has a nil
 `Criteria` map). `validateQuestion`, run at request time as described above,
-requires between 1 and 255 labels (`maxChoiceLabels = 255`) — zero labels
+requires between 1 and 255 labels (`maxChoiceLabels = 255`). Zero labels
 (including an absent or empty `criteria`) fails with
 `&typesafe.ValidationError{Path: "questions.<id>.criteria", Err: errors.New("choice requires at least one label")}`,
 and more than 255 fails naming the count.
@@ -150,7 +150,7 @@ describes score level `i`; `parseQuestion` accepts `criteria` being entirely
 absent (the resulting `typesafe.Score` then has a nil `Criteria` slice) and
 does not itself check how many entries it holds. `validateQuestion`, run at
 request time as described above, requires between `minScoreLevels = 2` and
-`maxScoreLevels = 10` entries — a count outside that range fails with
+`maxScoreLevels = 10` entries. A count outside that range fails with
 `&typesafe.ValidationError{Path: "questions.<id>.criteria", Err: fmt.Errorf("score requires between 2 and 10 levels, got <n>")}`.
 Each individual level value is validated as required text, an object, or an
 array (not optional, unlike `noul`/`choice` content).
@@ -162,7 +162,7 @@ marshaling as `null` when `Criteria` is nil.
 ### Any other type
 
 A `type` other than `"noul"`, `"choice"`, or `"score"` is decoded as-is into a
-`typesafe.RawQuestion` (`map[string]any`) with a plain `json.Unmarshal` — no
+`typesafe.RawQuestion` (`map[string]any`) with a plain `json.Unmarshal`. No
 field is rejected, no strict decoding applies, and no library-side validation
 runs beyond confirming `type` is a non-empty string (already guaranteed by
 `parseQuestion` before the value becomes a `RawQuestion`). It is sent to the
@@ -210,7 +210,7 @@ Each entry in `answers` is decoded by `decodeAnswer` according to its own
 
 A missing `"type"` on an answer, or a missing required field for a
 recognized type, is a `*typesafe.ResponseValidationError` naming the dotted
-field path (for example `answers.tone.confidence`) — this is a decode-time
+field path (for example `answers.tone.confidence`). This is a decode-time
 failure of the response, distinct from the request-side
 `*typesafe.ValidationError`s described above.
 

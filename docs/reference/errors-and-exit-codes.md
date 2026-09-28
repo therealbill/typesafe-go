@@ -65,7 +65,7 @@ Returns `"typesafe: <Endpoint> returned <Status>"`, with `": <Message()>"` appen
 func (e *APIError) Message() string
 ```
 
-Message extracts a human-readable message from the body. It understands the API's `"detail"` envelope in its string, object, and array forms, falls back to `"message"` or `"error"` fields, and otherwise returns the trimmed body. Every one of those code paths converges on a single return that first coerces the body to valid UTF-8 (`strings.ToValidUTF8(msg, "�")`, replacing invalid byte sequences with `�`) and then truncates the result to 200 bytes (`maxMessageLen`) without splitting a multi-byte UTF-8 rune — `truncate` walks back to the nearest rune boundary before cutting, appending `"..."` when a cut was made.
+Message extracts a human-readable message from the body. It understands the API's `"detail"` envelope in its string, object, and array forms, falls back to `"message"` or `"error"` fields, and otherwise returns the trimmed body. Every one of those code paths converges on a single return that first coerces the body to valid UTF-8 (`strings.ToValidUTF8(msg, "�")`, replacing invalid byte sequences with `�`) and then truncates the result to 200 bytes (`maxMessageLen`) without splitting a multi-byte UTF-8 rune. `truncate` walks back to the nearest rune boundary before cutting, appending `"..."` when a cut was made.
 
 ### RateLimitError
 
@@ -174,7 +174,7 @@ than the exit code: code 1 covers two distinct `kind` values, `"usage"` and
 | Constant | Code | Condition |
 |---|---|---|
 | `ExitOK` | 0 | Success. |
-| `ExitUsage` | 1 | Bad flags, unreadable or invalid request JSON, missing API key, or an unrecognized error. Covers `kind` `"usage"` and `kind` `"internal"` — see the classification table below. |
+| `ExitUsage` | 1 | Bad flags, unreadable or invalid request JSON, missing API key, or an unrecognized error. Covers `kind` `"usage"` and `kind` `"internal"`; see the classification table below. |
 | `ExitValidation` | 2 | Request failed client-side validation. |
 | `ExitAuth` | 3 | 401 or 403. |
 | `ExitRequest` | 4 | Other 4xx: 400, 404, 422. |
@@ -198,10 +198,10 @@ than the exit code: code 1 covers two distinct `kind` values, `"usage"` and
 | 7 | `*typesafe.APIError` | otherwise (e.g. 400, 404, 422) | `ExitRequest` (4) | `"request"` |
 | 8 | `*typesafe.ConnectionError` | any (includes `*typesafe.TimeoutError`, which embeds it) | `ExitConnection` (7) | `"connection"` |
 | 9 | `*typesafe.ResponseValidationError` | any | `ExitServer` (6) | `"invalid_response"` |
-| — | none of the above | — | `ExitUsage` (1) | `"internal"` |
+| Default | none of the above | n/a | `ExitUsage` (1) | `"internal"` |
 
 `*usageError` (order 2) marks errors caused by how the CLI itself was
-invoked — see [Usage errors versus validation errors](#usage-errors-versus-validation-errors)
+invoked. See [Usage errors versus validation errors](#usage-errors-versus-validation-errors)
 below. The final, unlabeled row is the fallback for an error that reached
 `fail` but matched none of the typed cases; it is reported with `kind`
 `"internal"` rather than `"usage"`, even though both share exit code 1.
@@ -210,7 +210,7 @@ The `"interrupted"` versus `"connection"` split is made by the CLI, not by
 the library. At the library level both cases are the same Go type: when the
 parent context passed to `SystemOne`/`ListModels` is done
 (`wrapTransportError` in `transport.go` checks `parent.Err() != nil` first),
-the request fails with `&typesafe.ConnectionError{Err: parent.Err()}` — the
+the request fails with `&typesafe.ConnectionError{Err: parent.Err()}`, the
 same type whatever the cause, carrying whichever error that context holds.
 `classify` is what separates them:
 
@@ -226,11 +226,11 @@ caller's own context.)
 
 ### Usage errors versus validation errors
 
-Input the CLI itself rejects before ever calling the library — malformed
+Input the CLI itself rejects before ever calling the library: malformed
 top-level request JSON (missing `"questions"`, missing `"state"`), a blank or
 whitespace-only flag-mode question key, an unknown field inside a JSON
-question object, `--state` given without any `--noul`/`--choice`/`--score` —
-all surface as `*usageError` (exit code 1, kind `"usage"`). This is distinct
+question object, or `--state` given without any `--noul`/`--choice`/`--score`.
+All of these surface as `*usageError` (exit code 1, kind `"usage"`). This is distinct
 from `*typesafe.ValidationError` (exit code 2, kind `"validation"`), which is
 the library's own semantic validation of an already-well-formed `Questions`
 map (for example a `Choice` with zero labels) performed after the CLI has

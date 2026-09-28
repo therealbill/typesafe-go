@@ -14,9 +14,9 @@ second call instead.
 
 ## Prerequisites
 
-- A working `SystemOne` call — see
+- A working `SystemOne` call, see
   [Your First Judgment in Go](../tutorials/first-judgment-in-go.md)
-- Familiarity with `Noul`, `Choice`, and `Score` — see the
+- Familiarity with `Noul`, `Choice`, and `Score`, see the
   [question types reference](../reference/question-types.md)
 
 ## Steps
@@ -24,7 +24,7 @@ second call instead.
 ### 1. Collect every independent question into one `Questions` map
 
 `Questions` is `map[string]Question`. Any mix of `Noul`, `Choice`, and
-`Score` values — or pointers to them — can live in the same map, and they're
+`Score` values (or pointers to them) can live in the same map, and they're
 all answered from the same `state` in one HTTP call:
 
 ```go
@@ -55,10 +55,10 @@ One call, one round trip, three typed answers back.
 
 ### 2. Choose identifiers for what they mean to your code, not the model
 
-The map's keys — `"is_billing"`, `"tone"`, `"urgency"` above — name the
+The map's keys (`"is_billing"`, `"tone"`, `"urgency"` above) name the
 answers in the response. They are not shown to the model, so they carry no
 instructional weight; the model only ever sees each question's
-`Instructions` and `Criteria`. Pick keys that read well in your own code
+`Instructions` and `Criteria`. Pick keys that fit naturally in your own code
 (`res.Nouls()["is_billing"]`), not keys that try to prime the model.
 
 ### 3. Call `SystemOne` once and read the typed answers back
@@ -78,11 +78,11 @@ answer type, so you don't have to type-assert every entry yourself. See
 [How to Act on Probabilities and Confidence](./act-on-probabilities-and-confidence.md)
 for what to do with the values once you have them.
 
-### 4. Know when a question needs another's answer — that's a second call
+### 4. Use a second call when a question depends on another's answer
 
 Every question in a `Questions` map is answered independently against the
 same `state`. None of them can see another's answer, because there isn't a
-sequencing or dependency concept inside one call — the model receives the
+sequencing or dependency concept inside one call. The model receives the
 whole map and answers all of it at once. If what you want to ask next
 depends on what came back (ask `category` only when `is_billing` is true,
 say), that dependency has to live in your Go code between two calls, not
@@ -121,7 +121,7 @@ answer that isn't known yet? The first case is one call; the second is two.
 
 ### 5. Keep an eye on how many questions you're bundling into one call
 
-Each call's question mix — total count and the per-type breakdown — is
+Each call's question mix, total count and the per-type breakdown, is
 available to instrumentation as `RequestInfo.QuestionCount`, `.NoulCount`,
 `.ChoiceCount`, and `.ScoreCount`. Nothing in the SDK caps how many questions
 you put in one map, but those counts exist so an `Instrumentation`
@@ -144,7 +144,7 @@ questions := typesafe.Questions{
 }
 ```
 
-That's the extent of it here — see
+That's the extent of it here. See
 [How to Send Fields the SDK Does Not Model Yet](./send-fields-the-sdk-does-not-model-yet.md)
 for what validation `RawQuestion` does and doesn't get.
 
@@ -172,14 +172,14 @@ anything that depends on an answer waits for a second one.
 **Symptom**: you expected one question's instructions to reference another
 question's answer, and it doesn't behave that way.
 **Cause**: there's no ordering or data flow between entries in one
-`Questions` map — the API answers the whole map against the same `state` in
+`Questions` map. The API answers the whole map against the same `state` in
 one pass.
 **Solution**: split the dependent question into a second `SystemOne` call, as
 in Step 4, and build its `state` or `Instructions` from the first call's
 result if needed.
 
 ### Problem: unsure whether to send five questions in one call or five separate calls
-**Symptom**: no error, just a design question.
+**Symptom**: no error, only a design question.
 **Cause**: both are valid; the SDK doesn't push you either way.
 **Solution**: default to one call for every question that only needs the
 original `state`. Only split when a question's instructions would need to
@@ -189,7 +189,7 @@ reference an answer you don't have yet.
 **Symptom**: a `RawQuestion`'s `"type"` value is rejected, either by the SDK
 or by the API.
 **Cause**: `RawQuestion` skips this package's own validation beyond
-requiring a non-empty string `"type"` field — anything past that is the
+requiring a non-empty string `"type"` field. Anything past that is the
 API's call.
 **Solution**: see
 [How to Send Fields the SDK Does Not Model Yet](./send-fields-the-sdk-does-not-model-yet.md).

@@ -13,7 +13,7 @@ logic.
 
 ## Prerequisites
 
-- A working `SystemOne` call — see
+- A working `SystemOne` call, see
   [Your First Judgment in Go](../tutorials/first-judgment-in-go.md)
 - Familiarity with `errors.As` error handling
 - For why the policy is shaped this way, see
@@ -23,7 +23,7 @@ logic.
 
 ### 1. Start from `DefaultRetryPolicy` and override only what you need
 
-A bare `RetryPolicy{}` only sets `MaxRetries` to 0 — every other field
+A bare `RetryPolicy{}` only sets `MaxRetries` to 0. Every other field
 (`Budget`, `RetryOnConnErr`, `RetryOnTimeout`, `HonorRetryAfter`) is left at
 its Go zero value, not the library's default. Always start from
 `DefaultRetryPolicy()` and change specific fields:
@@ -45,7 +45,7 @@ wall-clock budget per call.
 ### 2. Override the policy for a single call
 
 `WithRequestRetry` is a `RequestOption`, so it applies only to the call it's
-passed to — it never changes the client's configured policy for any other
+passed to. It never changes the client's configured policy for any other
 call:
 
 ```go
@@ -59,22 +59,22 @@ res, err := client.SystemOne(ctx, state, questions,
 ```
 
 Use this for a call with different latency tolerance than the rest of your
-traffic — a background batch job, say, versus a request on the critical path
+traffic: a background batch job, say, versus a request on the critical path
 of a user-facing request.
 
 Per-call options like `WithRequestRetry` are validated eagerly: `RequestOption`
-is `func(*requestConfig) error`, so a malformed value — a negative duration
-passed to `WithRequestTimeout`, for example — returns a
+is `func(*requestConfig) error`, so a malformed value (a negative duration
+passed to `WithRequestTimeout`, for example) returns a
 `*typesafe.ValidationError` immediately, before any network call. It surfaces
 through the same `err` returned from `SystemOne`/`SystemOneAs` above, so no
-special error-handling pattern is needed — just don't assume only server
+special error-handling pattern is needed. Don't assume only server
 responses can produce an error here.
 
 ### 3. Detect a rate limit and read `RetryAfter`
 
 When the API returns 429, the SDK surfaces a `*typesafe.RateLimitError`,
 which embeds `APIError` and adds `RetryAfter time.Duration` parsed from the
-response's `Retry-After` header — the server's raw requested wait,
+response's `Retry-After` header: the server's raw requested wait,
 unclamped, for your own code to inspect. Recognize it with `errors.As`:
 
 ```go
@@ -86,10 +86,10 @@ if errors.As(err, &rateLimitErr) {
 
 Separately, `RetryPolicy.MaxRetryAfter` (default 5 minutes, backfilled to
 that default automatically even in a hand-built policy) caps how long the
-SDK's *own* automatic retry loop actually waits when `HonorRetryAfter` is
-true and the server asks for longer. `HonorRetryAfter` no longer means "wait
-however long the server says" — it means "wait what the server says, up to
-`MaxRetryAfter`." This clamp never touches `RateLimitError.RetryAfter`
+SDK's *own* automatic retry loop waits when `HonorRetryAfter` is
+true and the server asks for longer. `HonorRetryAfter` means "wait what the
+server says, up to `MaxRetryAfter`," not "wait however long the server
+says." This clamp never touches `RateLimitError.RetryAfter`
 itself, only the SDK's internal sleep.
 
 To see this without a live rate limit, disable the SDK's own retries
@@ -120,7 +120,7 @@ if errors.As(err, &rateLimitErr) {
 ### 4. Let a caller-owned retry loop use `IsRetryable`
 
 `IsRetryable(err)` reports whether `DefaultRetryPolicy` would retry that
-error — independent of whatever policy the client is actually configured
+error, independent of whatever policy the client is configured
 with. Reach for it when you're retrying something bigger than one call, such
 as a whole batch, and want to give up immediately on errors that will never
 succeed no matter how many times you try:
@@ -146,7 +146,7 @@ for attempt := 0; attempt < 3; attempt++ {
 
 ### 5. Disable retries entirely
 
-Pass a `RetryPolicy` whose `MaxRetries` is 0 — either the zero value or
+Pass a `RetryPolicy` whose `MaxRetries` is 0, either the zero value or
 explicitly:
 
 ```go
@@ -179,7 +179,7 @@ instead of a bare status code.
 **Symptom**: retries happen for 5xx/429 but not for dropped connections, and
 a `Retry-After` header seems ignored.
 **Cause**: `RetryPolicy{MaxRetries: N}` sets every other field to its Go
-zero value — `RetryOnConnErr`, `RetryOnTimeout`, and `HonorRetryAfter` are
+zero value. `RetryOnConnErr`, `RetryOnTimeout`, and `HonorRetryAfter` are
 all `false` unless you started from `DefaultRetryPolicy()`.
 **Solution**: always build from `DefaultRetryPolicy()` and override
 individual fields, as in Steps 1 and 2.

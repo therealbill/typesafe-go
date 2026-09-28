@@ -13,10 +13,10 @@ client's own authentication and adding what the gateway requires.
 
 ## Prerequisites
 
-- A working `SystemOne` call — see
+- A working `SystemOne` call, see
   [Your First Judgment in Go](../tutorials/first-judgment-in-go.md)
 - Familiarity with client options (`Option`) and per-call options
-  (`RequestOption`) — see the
+  (`RequestOption`), see the
   [client options and environment reference](../reference/client-options-and-environment.md)
 
 ## Steps
@@ -33,7 +33,7 @@ client, err := typesafe.NewClient(
 )
 ```
 
-Outside of code, set `TYPESAFE_BASE_URL` in the environment instead —
+Outside of code, set `TYPESAFE_BASE_URL` in the environment instead.
 `WithBaseURL` only needs to be called when you want to override that
 per-client, for example to send one client through a gateway and another
 straight to the API.
@@ -41,8 +41,8 @@ straight to the API.
 ### 2. Add gateway authentication headers
 
 The client already sends `Authorization: Bearer <key>` on every request.
-`WithHeaders` adds further headers — such as a gateway's own API key header
-— alongside it, client-wide:
+`WithHeaders` adds further headers (such as a gateway's own API key header)
+alongside it, client-wide:
 
 ```go
 client, err := typesafe.NewClient(
@@ -54,7 +54,7 @@ client, err := typesafe.NewClient(
 
 Both headers reach the gateway on every call. Avoid naming a header
 `Authorization` in `WithHeaders` (or the per-call `WithExtraHeaders`) unless
-you intend to replace the client's own — headers are applied after the
+you intend to replace the client's own. Headers are applied after the
 client sets `Authorization`, so a same-named header wins.
 
 ### 3. Route through a custom transport
@@ -77,15 +77,15 @@ client, err := typesafe.NewClient(
 )
 ```
 
-The SDK copies the `http.Client` struct you pass in rather than holding a
-reference to it, so anything it does internally — such as wrapping the
-transport for instrumentation — never mutates `httpClient` itself. You can
+The SDK copies the `http.Client` struct you pass in. It does not hold a
+reference to it, so anything it does internally (such as wrapping the
+transport for instrumentation) never mutates `httpClient` itself. You can
 safely reuse the same `*http.Client` value elsewhere in your program.
 
 ### 4. Add gateway-specific request fields
 
-Some gateways expect extra top-level fields on every request body — a
-tenant ID, a routing key. `WithExtraBody` merges a map into the top level of
+Some gateways expect extra top-level fields on every request body, such as a
+tenant ID or a routing key. `WithExtraBody` merges a map into the top level of
 the JSON body for one call:
 
 ```go
@@ -95,13 +95,13 @@ res, err := client.SystemOne(ctx, state, questions,
 ```
 
 The merge is shallow and sits alongside the SDK's own `state`, `model`, and
-`questions` fields — don't reuse those names unless you mean to overwrite
+`questions` fields. Don't reuse those names unless you mean to overwrite
 them.
 
 ## Verify it works
 
 Point the client at a local `httptest.Server` standing in for the gateway,
-and confirm the request actually lands there:
+and confirm the request lands there:
 
 ```go
 gateway := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -148,7 +148,7 @@ include gateway-specific fields.
 
 ### Problem: requests still go to `https://api.typesafe.ai`
 **Symptom**: no traffic reaches the gateway despite calling `WithBaseURL`.
-**Cause**: `TYPESAFE_BASE_URL` is unset and `WithBaseURL` wasn't actually
+**Cause**: `TYPESAFE_BASE_URL` is unset and `WithBaseURL` wasn't
 passed to `NewClient` for that client instance, or a different client
 (without the option) is being used.
 **Solution**: confirm the option is on the exact `Option` slice passed to

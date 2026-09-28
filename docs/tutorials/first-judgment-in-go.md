@@ -25,9 +25,9 @@ A command-line Go program that:
 
 Every command below is one you actually run. The checkpoints show real output
 captured from the live API. TypeSafe's judgments come from a model, not a
-lookup table, so if you run these programs yourself, your probabilities,
-confidence values, and scores will land close to what's shown here but will
-rarely match to the decimal — that's expected, not a bug.
+lookup table. If you run these programs yourself, expect your probabilities,
+confidence values, and scores to land close to what's shown here, though they
+will rarely match to the decimal.
 
 ## Prerequisites
 
@@ -51,7 +51,7 @@ go get github.com/therealbill/typesafe-go
 ```
 
 Now export your API key so the library can find it. `typesafe.NewClient()`
-reads it from the `TYPESAFE_API_KEY` environment variable automatically — you
+reads it from the `TYPESAFE_API_KEY` environment variable automatically. You
 never pass it in code:
 
 ```bash
@@ -62,7 +62,7 @@ export TYPESAFE_API_KEY=<your API key>
 
 Open `go.mod`. You should see a `require` line for
 `github.com/therealbill/typesafe-go`, and a `go.sum` file should now exist
-alongside it. That's everything the library needs — it has no third-party
+alongside it. That's everything the library needs. It has no third-party
 dependencies of its own.
 
 ## Step 2: Ask three questions about a ticket
@@ -127,10 +127,10 @@ func main() {
 }
 ```
 
-A few things worth naming before you run it:
+Before you run it:
 
 - `state` is the piece of the world you're asking about. It can be a string,
-  a map, a slice, or a struct — anything that encodes to JSON.
+  a map, a slice, or a struct. Anything that encodes to JSON works.
 - `typesafe.Questions` is a map from an identifier you choose (`"billing"`,
   `"tone"`, `"urgency"`) to a question. That identifier is how you find the
   matching answer later; the model never sees it.
@@ -159,16 +159,16 @@ tone: angry
 urgency: 1.89
 ```
 
-`billing` is a probability from 0 to 1 — 0.98 means the model is almost
-certain this is a billing issue. `tone` is the chosen label. `urgency` is a
-position on the 0–2 rubric you defined, expressed as a probability-weighted
-score rather than a single integer — 1.89 sits between "somewhat urgent" (1)
-and "very urgent" (2), leaning toward the top.
+`billing` is a probability from 0 to 1. A value of 0.98 means the model is
+almost certain this is a billing issue. `tone` is the chosen label. `urgency`
+is a probability-weighted position on the 0–2 rubric you defined. Here, 1.89
+sits between "somewhat urgent" (1) and "very urgent" (2), leaning toward the
+top.
 
 ## Step 3: See the raw JSON
 
 The typed accessors you just used (`Nouls()`, `Choices()`, `Scores()`) are
-built from a response that's just JSON underneath. Every `*SystemOneResponse`
+built from the response's underlying JSON. Every `*SystemOneResponse`
 keeps the original bytes on `Raw.Body`, so you can look at exactly what the
 API sent back.
 
@@ -292,23 +292,23 @@ probabilities and scores):
 }
 ```
 
-> **What just happened?**
+> **What happened**
 >
 > This was a separate call from Step 2's, which is why `urgency.score` reads
-> 1.92 here instead of 1.89 — each call is an independent model judgment. You
-> can also see that `"model": "jev-1.13.0"` is a concrete, versioned model
-> name, even though nothing in the program asked for one — that's the
+> 1.92 here instead of 1.89. Each call is an independent model judgment. The
+> response also shows `"model": "jev-1.13.0"`, a concrete, versioned model
+> name, even though nothing in the program asked for one. That's the
 > library's default (`jev-latest`) resolved by the server to whichever
 > version currently backs it. Every answer type carries its own `"type"`
 > field (`noul`, `choice`, `score`), which is how the library knows which Go
-> type to decode each answer into. The full shape of this response — every
-> field, and how each answer type decodes — is documented on the
+> type to decode each answer into. The full shape of this response (every
+> field, and how each answer type decodes) is documented on the
 > [response types reference](../reference/response-types.md).
 
 ## Step 4: Decode into your own struct
 
 Reading `res.Nouls()["billing"]` works, but it means threading string keys
-through your code. `typesafe.SystemOneAs[T]` lets you decode straight into a
+through your code. `typesafe.SystemOneAs[T]` decodes straight into a
 struct of your own instead, tagged with the same identifiers you used in
 `Questions`.
 
@@ -378,9 +378,9 @@ func main() {
 }
 ```
 
-The field tags (`json:"billing"`, `json:"tone"`, `json:"urgency"`) are what
-tie each struct field back to the identifier you chose in `Questions` — the
-same three names throughout. `SystemOneAs` also returns the full
+The field tags (`json:"billing"`, `json:"tone"`, `json:"urgency"`) tie each
+struct field back to the identifier you chose in `Questions`, the same three
+names throughout. `SystemOneAs` also returns the full
 `*SystemOneResponse` as its second value (ignored here with `_`), so you
 still have access to `Usage`, `RequestID`, and `Raw` when you need them.
 
@@ -401,14 +401,14 @@ urgency: 1.91
 ```
 
 Same three answers as Step 2, now reached through struct fields instead of
-map lookups — and, again, a fresh call, so `urgency` moved slightly. For a
-task-focused walkthrough of designing answer structs — including optional
-questions and multiple question sets — see
+map lookups. This was again a fresh call, so `urgency` moved slightly. For a
+task-focused walkthrough of designing answer structs (including optional
+questions and multiple question sets), see
 [Decode answers into your own struct](../how-to/decode-answers-into-your-own-struct.md).
 
 ## Step 5: Handle a failed request
 
-Every real integration eventually calls the API with something wrong — an
+Every real integration eventually calls the API with something wrong: an
 expired key, a bad request, a rate limit. When that happens, `SystemOne` and
 `SystemOneAs` return a `*typesafe.APIError` you can recognize with
 `errors.As` and inspect for a status code and a human-readable message.
@@ -481,7 +481,7 @@ func main() {
 
 `typesafe.WithAPIKey("wrong-key")` overrides the environment variable for
 just this client, so your real `TYPESAFE_API_KEY` is untouched and unused
-here — this client simply can't authenticate. `errors.As` finds the
+here. This client can't authenticate. `errors.As` finds the
 `*typesafe.APIError` even if it were wrapped inside another error, which is
 the pattern to reach for in your own code any time a `SystemOne` call fails.
 
@@ -504,8 +504,8 @@ message: authentication_error: Cannot authenticate with the server. Please check
 extracts a human-readable string from the response body, so you don't have
 to parse `apiErr.Body` yourself in the common case.
 
-Once you're done experimenting, unset the fake key by simply not passing
-`WithAPIKey` — your program goes back to reading `TYPESAFE_API_KEY` from the
+Once you're done experimenting, unset the fake key by not passing
+`WithAPIKey`. Your program goes back to reading `TYPESAFE_API_KEY` from the
 environment, as it did in Steps 2 through 4.
 
 ## What you built

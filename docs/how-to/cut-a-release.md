@@ -14,7 +14,7 @@ what the automated pipeline builds and publishes from it.
 
 - Push access to the repository, with permission to push tags
 - A clean `main` (or the commit you intend to release) already merged
-- `jev version` already builds locally with `make build` — see
+- `jev version` already builds locally with `make build`, see
   [How to Configure Logging](./configure-logging.md)'s `bin/jev` prerequisite
   for confirming a local build works
 
@@ -30,7 +30,7 @@ git tag v1.2.0
 git push origin v1.2.0
 ```
 
-**Do not run these two commands as a rehearsal** — pushing a real `v*` tag
+**Do not run these two commands as a rehearsal.** Pushing a real `v*` tag
 starts the actual release pipeline and publishes a GitHub release. Everything
 past this point describes what that push does; treat it as reference, not a
 next step to try right now.
@@ -45,7 +45,7 @@ GoReleaser needs to generate a changelog from git log), sets up Go from
 ### 3. Know what GoReleaser builds
 
 `.goreleaser.yaml` builds the `./cmd/jev` binary for `goos: [darwin,
-linux]` × `goarch: [amd64, arm64]` — four binaries — with `CGO_ENABLED=0`.
+linux]` × `goarch: [amd64, arm64]` (four binaries) with `CGO_ENABLED=0`.
 Each build's `ldflags` inject the same two version symbols `make build` does
 locally:
 
@@ -71,7 +71,7 @@ log (`changelog.use: git`).
 
 `jev version` prints `{"version": ..., "commit": ..., "go": ...}`.
 Locally, without a real tag in the repository's history, `Version` and
-`Commit` both fall back to the same short commit hash — `Makefile`'s
+`Commit` both fall back to the same short commit hash. `Makefile`'s
 `VERSION` is `git describe --tags --always --dirty`, which falls back to
 `git rev-parse --short HEAD` when there's no tag to describe from. Once a
 real `v*` tag exists and is checked out, `git describe` reports that tag
@@ -92,29 +92,29 @@ $ ./bin/jev version --pretty
 }
 ```
 
-Both `version` and `commit` are the same short commit hash — this is a
+Both `version` and `commit` are the same short commit hash. This is a
 **local development build**, not a release. A binary built by the release
 workflow from a `v1.2.0` tag would instead report `"version": "1.2.0"` with
 `"commit"` still the short hash of the tagged commit.
 
 ✅ You know what a tag push does before you do it, and what the resulting
-binary's `jev version` output should look like once it's a real release
-rather than a local build.
+binary's `jev version` output should look like once it's a real release,
+not a local build.
 
 ## Troubleshooting
 
 ### Problem: the workflow doesn't start after pushing a tag
 **Symptom**: no `release` run appears in GitHub Actions.
 **Cause**: the tag doesn't match the `v*` glob (`.github/workflows/release.yml`'s
-`on.push.tags`), or it was pushed to a fork rather than this repository.
+`on.push.tags`), or it was pushed to a fork, not this repository.
 **Solution**: confirm the tag name starts with `v` (`v1.2.0`, not `1.2.0`),
 and that `git push origin <tag>` targeted the real repository's remote.
 
 ### Problem: GoReleaser fails with a changelog or version error
 **Symptom**: the `goreleaser-action` step fails early, before any build.
 **Cause**: the checkout didn't use `fetch-depth: 0`, or the tag wasn't an
-annotated/lightweight tag reachable from the checked-out history — both of
-which GoReleaser needs to compute `{{ .Version }}` and the git-log
+annotated/lightweight tag reachable from the checked-out history. GoReleaser
+needs both to compute `{{ .Version }}` and the git-log
 changelog.
 **Solution**: this repository's workflow already sets `fetch-depth: 0`; if
 you're reproducing the build locally with `goreleaser release --clean`,
@@ -122,10 +122,10 @@ make sure your local clone isn't shallow.
 
 ### Problem: `jev version` on a downloaded release binary still shows a raw commit hash instead of a version number
 **Symptom**: `"version"` doesn't look like `"1.2.0"`.
-**Cause**: you're running a binary built from a commit that wasn't actually
+**Cause**: you're running a binary built from a commit that wasn't
 tagged at build time, or ldflags weren't applied to that build.
 **Solution**: rebuild from a real `v*` tag through the release workflow, or
-locally with `git describe --tags` returning a real tag name — a local
+locally with `git describe --tags` returning a real tag name. A local
 `make build` on an untagged commit always falls back to the short hash, by
 design.
 
