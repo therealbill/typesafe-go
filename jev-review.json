@@ -1,11 +1,17 @@
 {
+  "description": "Units for jev review of this repository. Paths are relative to this file.",
   "spec": "docs/superpowers/specs/2026-09-23-typesafe-go-sdk-design.md",
   "units": [
     {
       "name": "questions",
       "spec_heading": "### Questions",
-      "implementation": ["question.go", "errors.go"],
-      "tests": ["question_test.go"],
+      "implementation": [
+        "question.go",
+        "errors.go"
+      ],
+      "tests": [
+        "question_test.go"
+      ],
       "behaviors": [
         "Noul.Criteria is omitted from the wire JSON when nil",
         "A nil Choice label value encodes as JSON null",
@@ -17,17 +23,25 @@
         "Instructions that are a number fail validation naming the instructions path",
         "Pointers to Noul, Choice, and Score are accepted as questions"
       ],
-      "accepted": ["contradicts_spec", "Noul.Criteria is omitted from the wire JSON when nil"],
+      "accepted": [
+        "contradicts_spec",
+        "Noul.Criteria is omitted from the wire JSON when nil"
+      ],
       "notes": [
-        "contradicts_spec: 0.44–0.49 across three runs with unrelated input changes; no spec/code conflict found on review",
-        "covers_00: 0.52–0.68 across five runs on byte-identical input; question_test.go pins it in the noul plain and noul no instructions cases and in TestNoulCriteriaOmittedWhenNil"
+        "contradicts_spec: 0.44\u20130.49 across three runs with unrelated input changes; no spec/code conflict found on review",
+        "covers_00: 0.52\u20130.68 across five runs on byte-identical input; question_test.go pins it in the noul plain and noul no instructions cases and in TestNoulCriteriaOmittedWhenNil"
       ]
     },
     {
       "name": "responses",
       "spec_heading": "### Responses",
-      "implementation": ["response.go", "models.go"],
-      "tests": ["response_test.go"],
+      "implementation": [
+        "response.go",
+        "models.go"
+      ],
+      "tests": [
+        "response_test.go"
+      ],
       "behaviors": [
         "An answer with an unrecognized type decodes to UnknownAnswer instead of failing",
         "A choice answer with a non-numeric confidence yields ResponseValidationError with path answers.<key>.confidence",
@@ -36,17 +50,24 @@
         "A NoulAnswer refuses to unmarshal from a choice payload",
         "The models list decodes name, description, and release_date"
       ],
-      "accepted": ["contradicts_spec", "thoroughness"],
+      "accepted": [
+        "contradicts_spec",
+        "thoroughness"
+      ],
       "notes": [
-        "contradicts_spec: 0.41–0.43, within noise of the 0.40 threshold; no conflict found on review",
+        "contradicts_spec: 0.41\u20130.43, within noise of the 0.40 threshold; no conflict found on review",
         "thoroughness: 1.87, 2.00, 1.98 across three runs with all six behaviors at 0.93 or above; threshold sits inside the model's drift band"
       ]
     },
     {
       "name": "errors",
       "spec_heading": "### Errors",
-      "implementation": ["errors.go"],
-      "tests": ["errors_test.go"],
+      "implementation": [
+        "errors.go"
+      ],
+      "tests": [
+        "errors_test.go"
+      ],
       "behaviors": [
         "APIError.Message extracts text from a detail string, a detail object, and a detail array",
         "RateLimitError unwraps to APIError via errors.As",
@@ -58,8 +79,14 @@
     {
       "name": "retry",
       "spec_heading": "### Retry policy",
-      "implementation": ["retry.go", "transport.go"],
-      "tests": ["retry_test.go", "client_test.go"],
+      "implementation": [
+        "retry.go",
+        "transport.go"
+      ],
+      "tests": [
+        "retry_test.go",
+        "client_test.go"
+      ],
       "behaviors": [
         "Default policy is 2 retries, 500ms initial delay, 5s max delay, 0.25 jitter, 30s budget",
         "Delay doubles each retry and is capped at MaxDelay",
@@ -74,8 +101,13 @@
     {
       "name": "client",
       "spec_heading": "### Client",
-      "implementation": ["client.go", "transport.go"],
-      "tests": ["client_test.go"],
+      "implementation": [
+        "client.go",
+        "transport.go"
+      ],
+      "tests": [
+        "client_test.go"
+      ],
       "behaviors": [
         "A 429 followed by a 200 is retried and the retry-after-ms wait is honored",
         "A 529 followed by a 200 is retried",
@@ -94,28 +126,44 @@
         "The Authorization header and request body are never logged",
         "The client is safe for concurrent use"
       ],
-      "accepted": ["contradicts_spec"],
-      "notes": ["contradicts_spec: 0.35 then 0.47 on byte-identical input; sampling variance"]
+      "accepted": [
+        "contradicts_spec"
+      ],
+      "notes": [
+        "contradicts_spec: 0.35 then 0.47 on byte-identical input; sampling variance"
+      ]
     },
     {
       "name": "typed",
       "spec_heading": "### Responses",
-      "implementation": ["typed.go"],
-      "tests": ["typed_test.go"],
+      "implementation": [
+        "typed.go"
+      ],
+      "tests": [
+        "typed_test.go"
+      ],
       "behaviors": [
         "SystemOneAs decodes answers into a caller struct with json tags",
         "SystemOneAs returns the full response alongside the typed value",
         "SystemOneAs returns ResponseValidationError when a field's answer type does not match",
         "SystemOneAs returns a nil response on request errors"
       ],
-      "accepted": ["thoroughness"],
-      "notes": ["thoroughness: 1.98, 2.05, 2.06, 2.06, 1.94 across five runs with all four behaviors at 0.87 or above; threshold sits inside the model's drift band"]
+      "accepted": [
+        "thoroughness"
+      ],
+      "notes": [
+        "thoroughness: 1.98, 2.05, 2.06, 2.06, 1.94 across five runs with all four behaviors at 0.87 or above; threshold sits inside the model's drift band"
+      ]
     },
     {
       "name": "otel",
       "spec_heading": "## Subpackage `typesafe/otel`",
-      "implementation": ["otel/otel.go"],
-      "tests": ["otel/otel_test.go"],
+      "implementation": [
+        "otel/otel.go"
+      ],
+      "tests": [
+        "otel/otel_test.go"
+      ],
       "behaviors": [
         "The operation span is named typesafe.system_one or typesafe.list_models with client kind",
         "gen_ai.request.model, gen_ai.response.model, and token usage attributes are set",
@@ -129,8 +177,20 @@
     {
       "name": "cli",
       "spec_heading": "## CLI: `cmd/jev`",
-      "implementation": ["internal/cli/root.go", "internal/cli/ask.go", "internal/cli/request.go", "internal/cli/exit.go", "internal/cli/models.go", "internal/cli/telemetry.go"],
-      "tests": ["internal/cli/cli_test.go", "internal/cli/request_test.go", "internal/cli/exit_test.go", "internal/cli/telemetry_test.go"],
+      "implementation": [
+        "internal/cli/root.go",
+        "internal/cli/ask.go",
+        "internal/cli/request.go",
+        "internal/cli/exit.go",
+        "internal/cli/models.go",
+        "internal/cli/telemetry.go"
+      ],
+      "tests": [
+        "internal/cli/cli_test.go",
+        "internal/cli/request_test.go",
+        "internal/cli/exit_test.go",
+        "internal/cli/telemetry_test.go"
+      ],
       "behaviors": [
         "JSON on stdin in the HTTP body shape is sent unchanged apart from client-side normalization",
         "The --model flag overrides a model in the JSON document",

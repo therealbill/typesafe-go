@@ -1,7 +1,7 @@
 bin/
 dist/
 coverage.out
-selfreview-report.json
+jev-review-report.json
 site/public/
 site/resources/
 site/.hugo_build.lock
