@@ -189,11 +189,13 @@ another program, potentially another agent, that misbehaves or is itself
 compromised. Without the cap, a pipe that never closes and keeps producing
 bytes grows `jev`'s memory without bound, and one malfunctioning upstream
 process becomes a resource-exhaustion problem for whatever is running `jev`.
-`tools/selfreview`, described in
-[What the self-review measures](what-the-self-review-measures.md), is a
-caller of exactly this shape: a program that constructs JSON and pipes it
-into `jev ask`. The limit therefore lives at the CLI layer and not only in
-documentation advice.
+The limit therefore lives at the CLI layer and not only in documentation
+advice; `internal/cli`'s own tests exercise it directly, rather than through
+a subprocess caller elsewhere in this repository. `jev review`, described in
+[What jev review measures](what-jev-review-measures.md), calls the
+`typesafe` library's `SystemOne` method directly through the same `Asker`
+interface a fake implements in tests, and is not itself a `jev ask`
+subprocess caller.
 
 ## The consumption pattern
 

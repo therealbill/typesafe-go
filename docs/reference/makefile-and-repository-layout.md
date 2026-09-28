@@ -17,7 +17,7 @@ $ make help
   vuln         Run govulncheck
   build        Build bin/jev
   integration  Run the live API test (needs TYPESAFE_API_KEY)
-  selfreview   Run the Jev-driven self-review (needs TYPESAFE_API_KEY)
+  review       Run jev review against this repository (needs TYPESAFE_API_KEY)
   docs         Build the site and check that every docs/ page is reachable and links resolve
   site         Build the documentation site into site/public
   site-serve   Serve the documentation site locally with live reload
@@ -33,9 +33,11 @@ repository root at the time this page was written:
 |---|---|
 | `*.go` (repository root) | The `typesafe` client library package (module `github.com/therealbill/typesafe-go`): `client.go`, `errors.go`, `instrument.go`, `models.go`, `question.go`, `response.go`, `retry.go`, `transport.go`, `typed.go`, `doc.go`, plus each file's `_test.go` counterpart and `integration_test.go`. |
 | `cmd/jev` | The `jev` binary's `main` package (`main.go`); calls `internal/cli.Main`. |
-| `internal/cli` | The `jev` command implementation: `root.go`, `ask.go`, `models.go`, `version.go`, `request.go`, `exit.go`, `output.go`, `telemetry.go`, and their `_test.go` counterparts. |
+| `internal/cli` | The `jev` command implementation: `root.go`, `ask.go`, `models.go`, `version.go`, `request.go`, `exit.go`, `output.go`, `telemetry.go`, `review.go`, and their `_test.go` counterparts. |
+| `internal/review` | The review logic behind `jev review`: `review.go`, `template.go`, `review_test.go`. Documented on the [jev review reference](jev-review.md). |
 | `otel` | The `typesafe/otel` package: an `Instrumentation` implementation (`otel.go`) that reports OpenTelemetry traces for client calls, plus `otel_test.go`. |
-| `tools/selfreview` | The self-review tool: `main.go`, `main_test.go`, and `units.json`. Documented on the [self-review tool reference](self-review-tool.md). |
+| `tools` | `checkdocs.sh`, the documentation link checker `make docs` runs. |
+| `jev-review.json` (repository root) | This repository's own `jev review` config. |
 | `testdata` | Fixture JSON files: `models_ok.json`, `request.json`, `systemone_ok.json`. |
 | `docs` | This documentation set: `_index.md` plus `explanation`, `how-to`, `reference`, `superpowers`, and `tutorials` subdirectories. |
 | `site` | The Hugo site that builds `docs/` (present in the repository at the time of writing): `hugo.toml`, `go.mod`, `go.sum`, `content`, `layouts`, `resources`, `public`. |

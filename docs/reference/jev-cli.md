@@ -1,6 +1,6 @@
 ---
 title: "jev CLI"
-description: "The jev binary: global flags, the ask/models/version subcommands, their input and output JSON shapes, telemetry-related environment variables, and exit codes."
+description: "The jev binary: global flags, the ask/models/review/version subcommands, their input and output JSON shapes, telemetry-related environment variables, and exit codes."
 diataxis: reference
 weight: 50
 ---
@@ -21,6 +21,7 @@ Available Commands:
   completion  Generate the autocompletion script for the specified shell
   help        Help about any command
   models      List the models available to the account as JSON
+  review      Ask Jev whether your tests cover the behaviors your spec requires
   version     Print version information as JSON
 
 Flags:
@@ -315,6 +316,63 @@ No command-specific flags. Calls `typesafe.Client.ListModels` and prints the JSO
 
 `ListModelsResponse` and `ModelMetadata` are documented on the [response types reference](./response-types.md).
 
+## `jev review`
+
+```
+$ ./bin/jev review --help
+Review a codebase against its specification.
+
+For each unit in the config file, jev review sends the named spec section and
+the implementation and test files to Jev and asks whether the tests exercise
+each listed behavior, whether the implementation contradicts the spec, how
+thorough the tests are, and which area is weakest. It reports probabilities
+and flags readings past the thresholds.
+
+It does not find bugs, review style, check security, or verify that the code
+is correct. Readings drift between runs on the same input.
+
+Start with: jev review init
+
+Usage:
+  jev review [flags]
+  jev review [command]
+
+Available Commands:
+  init        Write a starter jev-review.json
+
+Flags:
+  -h, --help                    help for review
+      --json                    print the report JSON on stdout instead of the Markdown summary
+      --max-contradict float    flag a unit whose contradiction probability is above this (default 0.4)
+      --max-state-bytes int     byte cap for implementation and tests together (default 100000)
+      --min-cover float         flag a behavior whose coverage probability is below this (default 0.6)
+      --min-thorough float      flag a unit whose thoroughness score is below this (default 2)
+      --only string             run a single unit by name
+      --report string           where to write the JSON report (default "jev-review-report.json")
+      --unit-timeout duration   time allowed for one unit's call (default 2m0s)
+      --units string            config file; paths inside it resolve relative to the file (default "jev-review.json")
+
+Global Flags:
+      --api-key string     TypeSafe API key (env TYPESAFE_API_KEY)
+      --base-url string    API base URL (env TYPESAFE_BASE_URL)
+      --log-level string   debug|info|warning|error|off (env TYPESAFE_LOG_LEVEL)
+      --max-retries int    retries after the first attempt (default 2)
+      --model string       model name (env TYPESAFE_DEFAULT_MODEL; default jev-latest)
+      --no-trace           disable tracing even when HONEYCOMB_API_KEY or OTEL_* is set
+      --pretty             indent JSON output
+      --timeout duration   per-attempt HTTP timeout (default 10s)
+      --trace              force OpenTelemetry tracing on
+
+Use "jev review [command] --help" for more information about a command.
+```
+
+`jev review` and `jev review init` build the client from the same global
+flags as every other subcommand. `jev review init` writes a starter
+`jev-review.json` and refuses to overwrite an existing file. The config
+schema, the four questions sent to Jev per unit, the JSON report shape, the
+Markdown summary, default thresholds, and exit code 8 are documented in full
+on the [jev review reference](./jev-review.md).
+
 ## `jev version`
 
 ```
@@ -420,6 +478,7 @@ jev: tracing shutdown: <error>
 | 5 | `ExitRateLimit` | 429 after retries. |
 | 6 | `ExitServer` | 5xx after retries, or an unreadable 2xx body. |
 | 7 | `ExitConnection` | Connection failure or timeout. |
+| 8 | `ExitFlagged` | `jev review` only: at least one unit is failing; see the report. |
 | 130 | `ExitInterrupted` | The context was cancelled, conventionally by SIGINT. |
 
 The full error-type-to-exit-code classification and the error JSON shape written to stdout on failure (including the `"usage"` versus `"internal"` split at code 1 and the `"interrupted"` case at code 130) are documented on the [errors and exit codes reference](./errors-and-exit-codes.md).

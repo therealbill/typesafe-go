@@ -161,6 +161,7 @@ const (
     ExitRateLimit   = 5   // 429 after retries
     ExitServer      = 6   // 5xx after retries, or an unreadable 2xx body
     ExitConnection  = 7   // connection failure or timeout
+    ExitFlagged     = 8   // jev review: at least one unit is failing; see the report
     ExitInterrupted = 130 // the context was cancelled, conventionally by SIGINT
 )
 ```
@@ -179,7 +180,17 @@ than the exit code: code 1 covers two distinct `kind` values, `"usage"` and
 | `ExitRateLimit` | 5 | 429 after retries. |
 | `ExitServer` | 6 | 5xx after retries, or an unreadable 2xx body. |
 | `ExitConnection` | 7 | Connection failure or timeout. |
+| `ExitFlagged` | 8 | `jev review` only: at least one unit is failing. Covers `kind` `"flagged"`. |
 | `ExitInterrupted` | 130 | The context was cancelled, conventionally by SIGINT. |
+
+Code 8 and `kind` `"flagged"` belong to `jev review` alone; no other
+subcommand produces them. `jev review` does not route a failing unit through
+`classify`: a unit whose Jev call itself failed with an API or transport
+error exits with that error's own classified code (3 to 7); a unit that ran
+but has an unaccepted flag, a missing file, a missing spec heading, or a
+timeout, with no call error, exits 8 instead. See the [jev review
+reference](./jev-review.md#exit-codes) for the full rule and the report
+shape.
 
 ## jev CLI: error classification
 

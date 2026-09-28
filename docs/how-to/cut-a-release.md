@@ -127,7 +127,7 @@ locally with `git describe --tags` returning a real tag name. A local
 
 ## Next steps
 
-- [Run the self-review](./run-the-self-review.md) before tagging, so a
+- [Review your codebase with Jev](./review-your-codebase-with-jev.md) before tagging, so a
   release isn't cut on top of a known, un-accepted regression.
 
 ## See also

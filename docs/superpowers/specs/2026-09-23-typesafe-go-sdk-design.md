@@ -415,6 +415,10 @@ every unit, sends flagged items to a code-review pass, fixes what that pass
 confirms, and reruns until nothing is flagged or remaining flags are
 explicitly accepted with a note in the report.
 
+This tool was later promoted from `tools/selfreview` to the `jev review`
+subcommand, usable on any codebase. See
+`2026-09-28-jev-review-design.md`.
+
 ## Tooling and release
 
 Go 1.25 minimum in `go.mod`: the stable OpenTelemetry line (otel v1.46.0,
