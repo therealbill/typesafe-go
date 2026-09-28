@@ -14,3 +14,7 @@ and mental models. Nothing here is a step to follow; read them when a
 - [Retries and budgets](retries-and-budgets.md)
 - [Why content is not traced by default](why-content-is-not-traced-by-default.md)
 - [Mapping from the Python SDK](mapping-from-the-python-sdk.md)
+- [How answers are decoded](how-answers-are-decoded.md)
+- [The instrumentation hook](the-instrumentation-hook.md)
+- [The agent-facing CLI contract](the-agent-facing-cli-contract.md)
+- [What the self-review measures](what-the-self-review-measures.md)
