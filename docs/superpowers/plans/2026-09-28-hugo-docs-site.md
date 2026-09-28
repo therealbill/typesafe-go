@@ -761,6 +761,18 @@ Report "Task 8 done" with the validator's summary counts.
 
 ---
 
+## Task 8b: Prose edit for plain, direct writing
+
+**Agent:** `docs` (after Task 8; added during execution at the user's request)
+
+The user reviewed the pages and found model mannerisms throughout: contrast-reveal sentences, narrated reasoning, staccato declaratives, em dashes, and prose that explains itself to the reader. Every page under `docs/` (excluding `superpowers/`), `README.md`, and `site/content/_index.md` gets an editing pass against Strunk and White: omit needless words, active voice, positive form, concrete language, one topic per paragraph, imperatives for instructions and plain declaratives for facts, third person in explanations, no em dashes, no rhetorical framing, no first-person narration. Facts, code, outputs, links, tables, headings, and front matter stay exactly as they are.
+
+- [ ] **Step 1: Dispatch one editing subagent per quadrant plus one for README and the landing page**, each with the rubric verbatim.
+- [ ] **Step 2: Read every edited page against the rubric; run the em-dash and banned-phrase greps before and after and report both counts.**
+- [ ] **Step 3: `make docs` passes; commit as "Edit documentation for plain, direct prose".**
+
+---
+
 ## Task 9: Enable Pages, push, watch the deploy
 
 **Agent:** lead (after Tasks 5 and 8 are committed)
