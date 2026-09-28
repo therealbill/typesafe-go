@@ -56,7 +56,7 @@ func NewRootCmd(streams IO, getenv func(string) string) *cobra.Command {
 	root.SetIn(streams.In)
 	root.SetOut(streams.Out)
 	root.SetErr(streams.Err)
-	root.AddCommand(newAskCmd(g, streams, getenv), newModelsCmd(g, streams, getenv), newVersionCmd(streams))
+	root.AddCommand(newAskCmd(g, streams, getenv), newModelsCmd(g, streams, getenv), newReviewCmd(g, streams, getenv), newVersionCmd(streams))
 	return root
 }
 

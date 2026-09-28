@@ -11,7 +11,9 @@ import (
 
 // Exit codes. A caller can branch on these without parsing output. The
 // "kind" field of the error JSON names the case more precisely than the code:
-// code 1 covers both kind "usage" and kind "internal".
+// code 1 covers both kind "usage" and kind "internal". Code 8 belongs to jev
+// review alone: it carries kind "flagged", and stdout holds the report rather
+// than an error envelope.
 const (
 	ExitOK          = 0
 	ExitUsage       = 1   // bad flags, unreadable or invalid request JSON, missing API key, or an unrecognized error
@@ -21,6 +23,7 @@ const (
 	ExitRateLimit   = 5   // 429 after retries
 	ExitServer      = 6   // 5xx after retries, or an unreadable 2xx body
 	ExitConnection  = 7   // connection failure or timeout
+	ExitFlagged     = 8   // jev review: at least one unit is failing; see the report
 	ExitInterrupted = 130 // the context was cancelled, conventionally by SIGINT
 )
 
