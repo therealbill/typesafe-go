@@ -970,7 +970,7 @@ Expected: all PASS, 0 issues. `tools/selfreview` still compiles and passes on it
 - Create: `internal/cli/review.go`, `internal/cli/review_test.go`
 - Modify: `internal/cli/exit.go` (add `ExitFlagged`), `internal/cli/root.go` (register the command)
 
-- [ ] **Step 1: Write the failing tests `internal/cli/review_test.go`**
+- [x] **Step 1: Write the failing tests `internal/cli/review_test.go`**
 
 ```go
 package cli
@@ -1135,14 +1135,14 @@ func TestReviewAPIErrorClassified(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 ```bash
 go test -run TestReview ./internal/cli/ 2>&1 | head -3
 ```
 Expected: `ExitFlagged` undefined, and `unknown command "review"` once it compiles.
 
-- [ ] **Step 3: Add `ExitFlagged` to `internal/cli/exit.go`**
+- [x] **Step 3: Add `ExitFlagged` to `internal/cli/exit.go`**
 
 In the const block, after `ExitConnection`:
 
@@ -1151,7 +1151,7 @@ In the const block, after `ExitConnection`:
 ```
 And extend the exit-code comment table in that file accordingly. `classify` is unchanged.
 
-- [ ] **Step 4: Write `internal/cli/review.go`**
+- [x] **Step 4: Write `internal/cli/review.go`**
 
 ```go
 package cli
@@ -1282,11 +1282,11 @@ func runReview(cmd *cobra.Command, g *globals, o *reviewOptions, streams IO, get
 
 Check the exact signature of `g.clientOptions` in `root.go` (it takes `changed func(string) bool` since the review fixes) and how `ask.go` obtains `changed`; match it.
 
-- [ ] **Step 5: Register the command in `root.go`**
+- [x] **Step 5: Register the command in `root.go`**
 
 In `NewRootCmd`, add `newReviewCmd(g, streams, getenv)` to the `AddCommand` call.
 
-- [ ] **Step 6: Run tests, lint, commit**
+- [x] **Step 6: Run tests, lint, commit**
 
 ```bash
 go test -race ./internal/cli/ 2>&1 | tail -3
