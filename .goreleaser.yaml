@@ -10,7 +10,7 @@ builds:
     goarch: [amd64, arm64]
     ldflags:
       - -s -w
-      - -X github.com/therealbill/typesafe-go/internal/version.Version={{ .Version }}
+      - -X github.com/therealbill/typesafe-go/internal/version.Version={{ .Tag }}
       - -X github.com/therealbill/typesafe-go/internal/version.Commit={{ .ShortCommit }}
 archives:
   - id: jev
