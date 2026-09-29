@@ -41,7 +41,7 @@ The file it writes is a template with one example unit:
 
 ```json
 {
-  "description": "Units for jev review. Paths are relative to this file. Each unit names one spec section, the files that implement it, the files that test it, and the behaviors the section requires, one concrete claim per line.",
+  "description": "Units for jev review. Paths are relative to this file. Each unit names one spec section, the files that implement it, the files that test it, and the behaviors the section requires, one concrete claim per line. A unit may set its own \"spec\" to override the top-level one.",
   "spec": "docs/design.md",
   "units": [
     {
@@ -66,7 +66,52 @@ Replace the example unit with one unit per spec section you want reviewed. Every
 
 Each unit needs a `name` that is unique across the file, a `spec_heading`, at least one `implementation` file, and at least one `behaviors` entry. `tests` and `notes` are optional. `accepted` defaults to empty.
 
-### 3. Write behaviors as concrete, testable claims
+### 3. Pair each section with the files that implement it
+
+Read the spec section and list the functions, types, and options it names.
+
+Find the non-test files that define them and use those as `implementation`:
+
+```
+grep -l 'func .*Name' *.go
+```
+
+Find the test files that reference those functions and types and use those as `tests`. A file with a similar name is not evidence. The exporter for a feature is not the feature.
+
+When a section's API spans several files, include them all. The state budget is 100 KB by default, split evenly between `implementation` and `tests`, and the report's `truncated` field is `true` when a bundle is cut.
+
+A unit that reads 0 of N behaviors with a real test file present usually means the wrong pairing, not missing tests. Fix the pairing before adding a test. A `tracker.go` feature paired with `exporter_test.go` is this mistake: the exporter's tests exercise the exporter, not the tracker, so every `covers_NN` reads near zero regardless of how well the tracker is actually tested elsewhere.
+
+Use `--only NAME` while you fix one unit's pairing, so each run judges only that unit.
+
+When the spec is spread across several documents, set `spec` on the unit that needs a different file than the top-level `spec`. It resolves relative to the config file, the same as every other path in it:
+
+```json
+{
+  "spec": "docs/design.md",
+  "units": [
+    {
+      "name": "storage",
+      "spec_heading": "## Storage",
+      "implementation": ["storage.go"],
+      "tests": ["storage_test.go"],
+      "behaviors": ["A write past the configured limit is rejected"]
+    },
+    {
+      "name": "cache",
+      "spec": "internal/cache/README.md",
+      "spec_heading": "## Eviction",
+      "implementation": ["internal/cache/lru.go"],
+      "tests": ["internal/cache/lru_test.go"],
+      "behaviors": ["The least recently used entry is evicted first"]
+    }
+  ]
+}
+```
+
+The `cache` unit's own `spec` overrides the top-level `spec` for that unit only; `storage` still reads from `docs/design.md`.
+
+### 4. Write behaviors as concrete, testable claims
 
 List five to fifteen behaviors per unit, one per line. A good behavior names a specific, checkable outcome. A bad one is vague or untestable.
 
@@ -80,7 +125,7 @@ Bad:
 - "Retries work correctly": nothing specific to assert.
 - "The code handles errors well": no concrete outcome named.
 
-### 4. Run `jev review`
+### 5. Run `jev review`
 
 A two-unit project with a retry policy and a validation rule, where the tests don't yet cover two of the five listed behaviors:
 
@@ -109,11 +154,11 @@ $ echo $?
 8
 ```
 
-### 5. Read the table and the flagged lines
+### 6. Read the table and the flagged lines
 
 "Behaviors covered" counts behaviors whose coverage probability is at or above `--min-cover` (default 0.6). "Contradicts" is the contradiction probability, flagged above `--max-contradict` (default 0.4). "Thoroughness" is the score with its confidence in parentheses, flagged below `--min-thorough` (default 2.0). Below the table, each flagged unit gets its own section naming the exact behavior or question that crossed a threshold.
 
-### 6. Decide how to respond to each flag
+### 7. Decide how to respond to each flag
 
 For each flag, choose one of three responses.
 
@@ -152,7 +197,7 @@ $ echo $?
 
 An acceptance always names the behavior's exact text. `jev review` rejects a `covers_NN`-shaped acceptance at load time, with an error explaining that renumbering the behaviors list would otherwise silently move the acceptance to a different claim.
 
-### 7. Iterate on one unit with `--only`
+### 8. Iterate on one unit with `--only`
 
 ```
 jev review --only retry
@@ -160,7 +205,7 @@ jev review --only retry
 
 This reruns a single named unit instead of the whole config, useful while you work through that unit's flags.
 
-### 8. Calibrate thresholds against your own drift
+### 9. Calibrate thresholds against your own drift
 
 `--min-cover`, `--max-contradict`, and `--min-thorough` all carry defaults, but none of them has a universally correct value. The right value is one calibrated against your own repeated runs on unchanged code. Watch a few runs of your own suite before changing any of them. See [What Jev Review Measures](../explanation/what-jev-review-measures.md) for why the defaults sit where they do.
 
@@ -172,7 +217,7 @@ A clean run exits 0:
 jev review; echo $?
 ```
 
-`jev review` also writes a JSON report, default path `jev-review-report.json` (add it to `.gitignore`), holding the same data as the Markdown table, one object per unit. `jev review --only retry --json` on the fixed scratch example from step 6:
+`jev review` also writes a JSON report, default path `jev-review-report.json` (add it to `.gitignore`), holding the same data as the Markdown table, one object per unit. `jev review --only retry --json` on the fixed scratch example from step 7:
 
 ```json
 [

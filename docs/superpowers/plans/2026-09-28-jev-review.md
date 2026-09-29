@@ -1495,16 +1495,16 @@ Send the lead the commit hash; the docs agent verifies against it.
 **Files:**
 - Modify: `docs/how-to/review-your-codebase-with-jev.md`, `docs/reference/jev-review.md`, `docs/explanation/what-jev-review-measures.md` (one sentence if it describes unit boundaries)
 
-- [ ] **Step 1: How-to.** Add a section, placed right after the step that edits the config, titled "Pair each section with the files that implement it", with these points in plain prose and one config snippet:
+- [x] **Step 1: How-to.** Add a section, placed right after the step that edits the config, titled "Pair each section with the files that implement it", with these points in plain prose and one config snippet:
   - Read the spec section and list the functions, types, and options it names.
   - Find the non-test files that define them (`grep -l 'func .*Name' *.go`) and use those as `implementation`; find the test files that reference them and use those as `tests`. A file with a similar name is not evidence; the exporter for a feature is not the feature.
   - When a section's API spans several files, include them all; the state budget is 100 KB by default and the report says `truncated` when it is hit.
   - A unit that reads 0 of N with a real test file present usually means the wrong pairing; fix the pairing before adding tests. Show the shape of that mistake with a generic example (a `tracker.go` feature paired with `exporter_test.go`), not a named repository.
   - Use `--only NAME` while iterating on one unit.
   - For repositories whose spec is spread across several documents, set `spec` on the unit; show a two-unit snippet with a top-level spec and one per-unit override.
-- [ ] **Step 2: Reference.** In the config schema, add the unit-level `spec` field (optional, overrides the top level, resolved relative to the config file) and note that the top-level `spec` is optional when every unit sets one; update the validation rule list.
-- [ ] **Step 3: Explanation.** If the unit-boundaries section exists, add one sentence that a per-unit spec lets a unit follow the document that actually describes it.
-- [ ] **Step 4: Verify against the committed code and commit.** Wait for the lead's message with the Task 7 hash, then run `make build && ./bin/jev review init --units /tmp/x/jev-review.json` to confirm the template text, and build a two-spec scratch config to confirm `jev review` accepts a unit-level `spec` (it may exit 8; you are checking acceptance, not results). Then:
+- [x] **Step 2: Reference.** In the config schema, add the unit-level `spec` field (optional, overrides the top level, resolved relative to the config file) and note that the top-level `spec` is optional when every unit sets one; update the validation rule list.
+- [x] **Step 3: Explanation.** If the unit-boundaries section exists, add one sentence that a per-unit spec lets a unit follow the document that actually describes it.
+- [x] **Step 4: Verify against the committed code and commit.** Wait for the lead's message with the Task 7 hash, then run `make build && ./bin/jev review init --units /tmp/x/jev-review.json` to confirm the template text, and build a two-spec scratch config to confirm `jev review` accepts a unit-level `spec` (it may exit 8; you are checking acceptance, not results). Then:
 
 ```bash
 make docs && echo "docs ok"

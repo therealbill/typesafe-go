@@ -44,6 +44,8 @@ Reviewed with `transport.go` and `client_test.go` also included, this repository
 
 Nothing about the code changed between these two runs. Only which files the unit's `implementation` and `tests` lists named changed. The behaviors listed for a unit, and the files bundled to answer them, define what the reading can see. A unit whose file lists do not include the tests that actually exercise a behavior reads as under-tested even when that behavior is well tested elsewhere in the same codebase.
 
+A unit's own `spec` follows the same principle for the spec side of the reading: it lets a unit read the document that actually describes it, when the code it covers is documented apart from the top-level spec.
+
 ## What accepted and stale-acceptance lines record
 
 An `accepted` entry on a unit names one flag that may keep firing without making the run fail: a behavior's exact text, or one of the fixed ids `contradicts_spec`, `thoroughness`, `weakest_area`. Config loading rejects an acceptance written as a positional id like `covers_00`, requiring the behavior's own text instead, so reordering or inserting a behavior cannot silently reassign an old acceptance to a different, unreviewed claim.

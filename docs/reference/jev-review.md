@@ -162,6 +162,7 @@ type Config struct {
 }
 type Unit struct {
     Name           string   `json:"name"`
+    Spec           string   `json:"spec,omitempty"`
     SpecHeading    string   `json:"spec_heading"`
     Implementation []string `json:"implementation"`
     Tests          []string `json:"tests"`
@@ -176,7 +177,7 @@ type Unit struct {
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `description` | string | No | Free-text description of the config. Omitted from the wire JSON when empty. |
-| `spec` | string | Yes | Path to the spec file. Required (non-empty after trimming). |
+| `spec` | string | Conditional | Path to the spec file used by any unit that does not set its own `spec`. Required unless every unit sets its own `spec`. |
 | `units` | array of `Unit` | Yes | The units to run. Must have at least one entry. |
 
 ### `Unit` fields
@@ -184,6 +185,7 @@ type Unit struct {
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `name` | string | Yes | Identifies the unit in the report and in `--only`. Required, non-empty, and must be unique across the config; a duplicate name is a load error. |
+| `spec` | string | No | Path to a spec file that overrides the top-level `spec` for this unit only. Omitted or empty falls back to the top-level `spec`. |
 | `spec_heading` | string | Yes | A Markdown heading line (for example `"### Questions"`), matched exactly against a heading in the spec file. The section it names runs from that heading through the line before the next heading of the same or higher level, ignoring headings that appear inside fenced code blocks. |
 | `implementation` | array of string | Yes | File paths making up the implementation bundle. At least one entry is required. |
 | `tests` | array of string | No | File paths making up the tests bundle. Omitted or empty is valid. |
@@ -191,9 +193,17 @@ type Unit struct {
 | `accepted` | array of string | No | Acknowledged flag ids and behavior text; see below. Omitted or empty is valid. |
 | `notes` | array of string | No | Free-text entries, copied into the report's `notes` field. Omitted or empty is valid. |
 
-All paths, including the top-level `spec` and each unit's `implementation`
-and `tests` entries, resolve relative to the directory containing the config
-file; an absolute path is used as-is.
+Every unit resolves a spec file: its own `spec` when set, otherwise the
+top-level `spec`. The top-level `spec` is required only for a unit that does
+not set its own; a config with such a unit and no top-level `spec` is a
+`Load` error naming the unit, `unit "<name>": "spec" is required at the top
+level or on every unit`. A unit whose resolved spec file cannot be read is a
+unit error, recorded in the report, not a `Load` error. Units that share a
+spec path read it once; the file is not re-read per unit.
+
+All paths, including the top-level `spec`, each unit's own `spec` when set,
+and each unit's `implementation` and `tests` entries, resolve relative to
+the directory containing the config file; an absolute path is used as-is.
 
 Each `accepted` entry must be either the exact text of one of that unit's
 `behaviors`, or one of the fixed ids `contradicts_spec`, `thoroughness`,
@@ -213,7 +223,7 @@ The `init` template, written by `jev review init`:
 
 ```json
 {
-  "description": "Units for jev review. Paths are relative to this file. Each unit names one spec section, the files that implement it, the files that test it, and the behaviors the section requires, one concrete claim per line.",
+  "description": "Units for jev review. Paths are relative to this file. Each unit names one spec section, the files that implement it, the files that test it, and the behaviors the section requires, one concrete claim per line. A unit may set its own \"spec\" to override the top-level one.",
   "spec": "docs/design.md",
   "units": [
     {
