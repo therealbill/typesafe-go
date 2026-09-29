@@ -24,14 +24,20 @@ import (
 // resolve relative to the directory that contains the config file.
 type Config struct {
 	Description string `json:"description,omitempty"`
-	Spec        string `json:"spec"`
-	Units       []Unit `json:"units"`
+	// Spec is the specification document every unit reads by default. It is
+	// optional when every unit sets its own Spec.
+	Spec  string `json:"spec"`
+	Units []Unit `json:"units"`
 }
 
 // Unit pairs one spec section with the files that implement and test it and
 // the behaviors the section requires.
 type Unit struct {
-	Name           string   `json:"name"`
+	Name string `json:"name"`
+	// Spec is the specification document this unit reads. It overrides the
+	// top-level Spec and suits a repository whose specification is spread
+	// across several documents.
+	Spec           string   `json:"spec,omitempty"`
 	SpecHeading    string   `json:"spec_heading"`
 	Implementation []string `json:"implementation"`
 	Tests          []string `json:"tests"`
@@ -155,9 +161,6 @@ func Load(path string) (*Config, string, error) {
 }
 
 func validate(cfg *Config) error {
-	if strings.TrimSpace(cfg.Spec) == "" {
-		return errors.New(`"spec" is required`)
-	}
 	if len(cfg.Units) == 0 {
 		return errors.New("at least one unit is required")
 	}
@@ -171,6 +174,9 @@ func validate(cfg *Config) error {
 			return fmt.Errorf("duplicate unit name %q", u.Name)
 		}
 		seen[u.Name] = true
+		if strings.TrimSpace(u.Spec) == "" && strings.TrimSpace(cfg.Spec) == "" {
+			return fmt.Errorf(`unit %q: "spec" is required at the top level or on every unit`, u.Name)
+		}
 		if strings.TrimSpace(u.SpecHeading) == "" {
 			return fmt.Errorf("unit %q: spec_heading is required", u.Name)
 		}
@@ -196,6 +202,36 @@ func validate(cfg *Config) error {
 	return nil
 }
 
+// specCache holds the specification documents a run has read, keyed by
+// resolved path, so that units sharing a document read it once. A read error
+// is cached with the path and returned to every unit that names it.
+type specCache struct {
+	base string
+	docs map[string]specDoc
+}
+
+type specDoc struct {
+	text string
+	err  error
+}
+
+func newSpecCache(base string) *specCache {
+	return &specCache{base: base, docs: map[string]specDoc{}}
+}
+
+// read returns the contents of a spec path resolved against the config
+// directory.
+func (c *specCache) read(path string) (string, error) {
+	resolved := resolve(c.base, path)
+	doc, ok := c.docs[resolved]
+	if !ok {
+		b, err := os.ReadFile(resolved)
+		doc = specDoc{text: string(b), err: err}
+		c.docs[resolved] = doc
+	}
+	return doc.text, doc.err
+}
+
 func resolve(base, p string) string {
 	if filepath.IsAbs(p) {
 		return p
@@ -204,20 +240,17 @@ func resolve(base, p string) string {
 }
 
 // Run evaluates every unit (or the one named by opts.Only) and returns the
-// report. Errors reading files or a spec section, API failures, and
-// timeouts are recorded on the unit; Run itself fails only when no unit
-// matched or the spec file cannot be read.
+// report. Errors reading a spec document, reading files, or finding a spec
+// section, API failures, and timeouts are recorded on the unit; Run itself
+// fails only when no unit matched.
 func Run(ctx context.Context, cfg *Config, base string, asker Asker, opts Options) (Report, error) {
-	specBytes, err := os.ReadFile(resolve(base, cfg.Spec))
-	if err != nil {
-		return Report{}, err
-	}
+	specs := newSpecCache(base)
 	var rep Report
 	for _, u := range cfg.Units {
 		if opts.Only != "" && u.Name != opts.Only {
 			continue
 		}
-		rep.Units = append(rep.Units, runUnit(ctx, u, string(specBytes), base, asker, opts))
+		rep.Units = append(rep.Units, runUnit(ctx, u, specs, cfg.Spec, base, asker, opts))
 	}
 	if len(rep.Units) == 0 {
 		return rep, ErrNoUnits
@@ -225,8 +258,17 @@ func Run(ctx context.Context, cfg *Config, base string, asker Asker, opts Option
 	return rep, nil
 }
 
-func runUnit(ctx context.Context, u Unit, spec, base string, asker Asker, opts Options) UnitReport {
+func runUnit(ctx context.Context, u Unit, specs *specCache, defaultSpec, base string, asker Asker, opts Options) UnitReport {
 	r := UnitReport{Name: u.Name, Notes: u.Notes}
+	specPath := u.Spec
+	if strings.TrimSpace(specPath) == "" {
+		specPath = defaultSpec
+	}
+	spec, err := specs.read(specPath)
+	if err != nil {
+		r.Error, r.Failing = err.Error(), true
+		return r
+	}
 	section, err := extractSection(spec, u.SpecHeading)
 	if err != nil {
 		r.Error, r.Failing = err.Error(), true

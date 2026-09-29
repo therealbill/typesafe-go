@@ -345,4 +345,138 @@ func TestTemplateLoads(t *testing.T) {
 	if cfg.Description == "" || len(cfg.Units) != 1 || len(cfg.Units[0].Behaviors) < 2 {
 		t.Fatalf("template shape: %+v", cfg)
 	}
+	if !strings.Contains(cfg.Description, `A unit may set its own "spec" to override the top-level one.`) {
+		t.Fatalf("the template description must mention the per-unit override: %q", cfg.Description)
+	}
+}
+
+func TestLoadAcceptsPerUnitSpecWithoutTopLevelSpec(t *testing.T) {
+	dir := t.TempDir()
+	p := writeConfig(t, dir, `{"units":[{"name":"a","spec":"a.md","spec_heading":"## A","implementation":["a.go"],"behaviors":["b"]},{"name":"b","spec":"b.md","spec_heading":"## B","implementation":["b.go"],"behaviors":["b"]}]}`)
+	cfg, base, err := Load(p)
+	if err != nil {
+		t.Fatalf("a config whose units all set a spec must load: %v", err)
+	}
+	if base != dir || cfg.Spec != "" {
+		t.Fatalf("base %q cfg %+v", base, cfg)
+	}
+	if cfg.Units[0].Spec != "a.md" || cfg.Units[1].Spec != "b.md" {
+		t.Fatalf("per-unit specs not decoded: %+v", cfg.Units)
+	}
+}
+
+func TestLoadRejectsAUnitWithNoSpecAnywhere(t *testing.T) {
+	p := writeConfig(t, t.TempDir(), `{"units":[{"name":"a","spec":"a.md","spec_heading":"## A","implementation":["a.go"],"behaviors":["b"]},{"name":"b","spec_heading":"## B","implementation":["b.go"],"behaviors":["b"]}]}`)
+	_, _, err := Load(p)
+	const want = `"spec" is required at the top level or on every unit`
+	if err == nil || !strings.Contains(err.Error(), want) {
+		t.Fatalf("got %v want substring %q", err, want)
+	}
+	if !strings.Contains(err.Error(), `unit "b"`) {
+		t.Fatalf("the message must name the unit that lacks a spec: %v", err)
+	}
+}
+
+func TestSpecCacheReadsEachPathOnce(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "spec.md")
+	if err := os.WriteFile(p, []byte("## A\n\ntext\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	c := newSpecCache(dir)
+	first, err := c.read("spec.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(p); err != nil {
+		t.Fatal(err)
+	}
+	second, err := c.read("spec.md")
+	if err != nil || second != first {
+		t.Fatalf("the second read must come from the cache, got %q %v", second, err)
+	}
+	if _, err := c.read("missing.md"); err == nil {
+		t.Fatal("an unreadable spec must return its error")
+	}
+}
+
+// setupSplitSpecRepo writes one spec document per unit and a config whose
+// second unit overrides the top-level spec.
+func setupSplitSpecRepo(t *testing.T) (string, string) {
+	t.Helper()
+	dir := t.TempDir()
+	_ = os.WriteFile(filepath.Join(dir, "spec.md"), []byte("# Spec\n\n## Retry\n\nretry text\n"), 0o600)
+	_ = os.WriteFile(filepath.Join(dir, "other.md"), []byte("# Other\n\n## Other\n\nother text\n"), 0o600)
+	_ = os.WriteFile(filepath.Join(dir, "retry.go"), []byte("package x\n// impl\n"), 0o600)
+	_ = os.WriteFile(filepath.Join(dir, "retry_test.go"), []byte("package x\n// tests\n"), 0o600)
+	p := writeConfig(t, dir, `{"spec":"spec.md","units":[{"name":"retry","spec_heading":"## Retry","implementation":["retry.go"],"tests":["retry_test.go"],"behaviors":["b0"]},{"name":"other","spec":"other.md","spec_heading":"## Other","implementation":["retry.go"],"tests":["retry_test.go"],"behaviors":["b0"]}]}`)
+	return dir, p
+}
+
+func TestRunSendsEachUnitItsOwnSpec(t *testing.T) {
+	_, p := setupSplitSpecRepo(t)
+	cfg, base, err := Load(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fa := &fakeAsker{answers: answers([]float64{0.9}, 0.1, 2.5, 0.8, "none")}
+	rep, err := Run(context.Background(), cfg, base, fa, defaults())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rep.Units) != 2 || rep.Failing() {
+		t.Fatalf("report %+v", rep)
+	}
+	if len(fa.states) != 2 {
+		t.Fatalf("want 2 calls, got %d", len(fa.states))
+	}
+	if s := fa.states[0]["spec"].(string); !strings.Contains(s, "retry text") || strings.Contains(s, "other text") {
+		t.Fatalf("the first unit must get the top-level spec: %q", s)
+	}
+	if s := fa.states[1]["spec"].(string); !strings.Contains(s, "other text") || strings.Contains(s, "retry text") {
+		t.Fatalf("the second unit must get its own spec: %q", s)
+	}
+}
+
+func TestRunMissingSpecIsUnitError(t *testing.T) {
+	dir, p := setupSplitSpecRepo(t)
+	if err := os.Remove(filepath.Join(dir, "other.md")); err != nil {
+		t.Fatal(err)
+	}
+	cfg, base, err := Load(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fa := &fakeAsker{answers: answers([]float64{0.9}, 0.1, 2.5, 0.8, "none")}
+	rep, err := Run(context.Background(), cfg, base, fa, defaults())
+	if err != nil {
+		t.Fatalf("an unreadable unit spec must not stop the run: %v", err)
+	}
+	if len(rep.Units) != 2 {
+		t.Fatalf("both units belong in the report: %+v", rep)
+	}
+	if rep.Units[0].Failing || rep.Units[0].Error != "" {
+		t.Fatalf("the unit with a readable spec still runs: %+v", rep.Units[0])
+	}
+	if !rep.Units[1].Failing || !strings.Contains(rep.Units[1].Error, "other.md") {
+		t.Fatalf("the unit with the missing spec must carry the error: %+v", rep.Units[1])
+	}
+	if len(fa.states) != 1 {
+		t.Fatalf("only the unit with a readable spec should call: %d", len(fa.states))
+	}
+
+	if err := os.Remove(filepath.Join(dir, "spec.md")); err != nil {
+		t.Fatal(err)
+	}
+	fa = &fakeAsker{answers: answers([]float64{0.9}, 0.1, 2.5, 0.8, "none")}
+	rep, err = Run(context.Background(), cfg, base, fa, defaults())
+	if err != nil {
+		t.Fatalf("an unreadable top-level spec must not stop the run: %v", err)
+	}
+	if len(rep.Units) != 2 || !rep.Units[0].Failing || !strings.Contains(rep.Units[0].Error, "spec.md") {
+		t.Fatalf("every unit must carry its own spec error: %+v", rep.Units)
+	}
+	if len(fa.states) != 0 {
+		t.Fatalf("no unit should call: %d", len(fa.states))
+	}
 }

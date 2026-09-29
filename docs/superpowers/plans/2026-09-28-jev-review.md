@@ -1475,9 +1475,9 @@ Design:
 - `Run` reads spec files per unit through a cache keyed by resolved path. A spec that cannot be read is a unit error (the unit's `error` field), not a `Run` error; `Run` still returns `ErrNoUnits` when nothing matched.
 - The template's `description` gains: `A unit may set its own "spec" to override the top-level one.` The template keeps one unit.
 
-- [ ] **Step 1: Tests first** in `review_test.go`: `Load` accepts a config with no top-level spec when every unit sets one; rejects a config where one unit lacks a spec and there is no top-level one, with the message above; `Run` with two units pointing at two different spec files sends each unit its own section (assert on the fake asker's `states[i]["spec"]`); a unit whose spec file is missing gets a unit error while the other unit still runs; `TestTemplateLoads` still passes.
-- [ ] **Step 2: Implement**, keeping every existing test green.
-- [ ] **Step 3: Verify and commit**
+- [x] **Step 1: Tests first** in `review_test.go`: `Load` accepts a config with no top-level spec when every unit sets one; rejects a config where one unit lacks a spec and there is no top-level one, with the message above; `Run` with two units pointing at two different spec files sends each unit its own section (assert on the fake asker's `states[i]["spec"]`); a unit whose spec file is missing gets a unit error while the other unit still runs; `TestTemplateLoads` still passes.
+- [x] **Step 2: Implement**, keeping every existing test green.
+- [x] **Step 3: Verify and commit**
 
 ```bash
 go test -race ./internal/review/ ./internal/cli/ && golangci-lint run ./internal/...

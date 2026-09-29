@@ -3,7 +3,7 @@ package review
 // Template returns a starter jev-review.json. Paths in it are examples.
 func Template() []byte {
 	return []byte(`{
-  "description": "Units for jev review. Paths are relative to this file. Each unit names one spec section, the files that implement it, the files that test it, and the behaviors the section requires, one concrete claim per line.",
+  "description": "Units for jev review. Paths are relative to this file. Each unit names one spec section, the files that implement it, the files that test it, and the behaviors the section requires, one concrete claim per line. A unit may set its own \"spec\" to override the top-level one.",
   "spec": "docs/design.md",
   "units": [
     {
