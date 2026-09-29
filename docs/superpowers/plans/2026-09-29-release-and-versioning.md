@@ -319,14 +319,14 @@ git commit -m "Document install paths, version reporting, and the release flow"
 
 **Agent:** lead (after Tasks 2 and 3)
 
-- [ ] **Step 1: Gate and push**
+- [x] **Step 1: Gate and push**
 
 ```bash
 make lint && make test && make docs && git status --short && echo "(clean)"
 git push origin main
 ```
 
-- [ ] **Step 2: Cut the release**
+- [x] **Step 2: Cut the release**
 
 ```bash
 make release VERSION=v0.1.0
@@ -335,7 +335,7 @@ gh release view v0.1.0 --json assets -q '.assets[].name'
 ```
 Expected: four `jev_v0.1.0_*.tar.gz` archives (or `jev_0.1.0_*` depending on goreleaser's archive template; report which) and `checksums.txt`.
 
-- [ ] **Step 3: Verify the go install path**
+- [x] **Step 3: Verify the go install path**
 
 ```bash
 tmp=$(mktemp -d) && GOBIN=$tmp GOFLAGS= go install github.com/therealbill/typesafe-go/cmd/jev@v0.1.0 && $tmp/jev version
@@ -343,6 +343,6 @@ GOBIN=$tmp GOFLAGS= go install github.com/therealbill/typesafe-go/cmd/jev@latest
 ```
 Expected: `"version":"v0.1.0"`, `"source":"module"` for both (until a newer tag exists). If the module proxy has not indexed the tag yet, wait a minute and retry with `GOPROXY=direct`.
 
-- [ ] **Step 4: Docs deploy and plan**
+- [x] **Step 4: Docs deploy and plan**
 
 The docs push in Step 1 triggers the site deploy; confirm it succeeded. Tick the plan, commit, push, report.
