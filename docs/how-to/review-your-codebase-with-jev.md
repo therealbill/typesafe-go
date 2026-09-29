@@ -14,7 +14,7 @@ aliases: ["/docs/how-to/run-the-self-review/"]
 
 - A `jev` binary: a release download, or `make build` in this repository.
 - `TYPESAFE_API_KEY` set in the environment. `jev review` sends real requests to Jev.
-- A Markdown spec file with headings describing the behavior you want reviewed.
+- A Markdown spec file with headings describing the behavior you want reviewed. See [How to write a spec jev review can use](./write-a-spec-jev-review-can-use.md) for how to structure and word it.
 
 ## Steps
 

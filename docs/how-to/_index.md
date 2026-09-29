@@ -20,4 +20,5 @@ so they skip background and go straight to the steps.
 - [Send fields the SDK does not model yet](send-fields-the-sdk-does-not-model-yet.md)
 - [Configure logging](configure-logging.md)
 - [Review your codebase with Jev](review-your-codebase-with-jev.md)
+- [How to Write a Spec jev review Can Use](write-a-spec-jev-review-can-use.md)
 - [Cut a release](cut-a-release.md)

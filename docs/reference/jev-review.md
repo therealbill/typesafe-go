@@ -186,7 +186,7 @@ type Unit struct {
 |---|---|---|---|
 | `name` | string | Yes | Identifies the unit in the report and in `--only`. Required, non-empty, and must be unique across the config; a duplicate name is a load error. |
 | `spec` | string | No | Path to a spec file that overrides the top-level `spec` for this unit only. Omitted or empty falls back to the top-level `spec`. |
-| `spec_heading` | string | Yes | A Markdown heading line (for example `"### Questions"`), matched exactly against a heading in the spec file. The section it names runs from that heading through the line before the next heading of the same or higher level, ignoring headings that appear inside fenced code blocks. |
+| `spec_heading` | string | Yes | A Markdown heading line (for example `"### Questions"`), matched exactly against a heading in the spec file. The section it names runs from that heading through the line before the next heading of the same or higher level, ignoring headings that appear inside fenced code blocks. See [How to write a spec jev review can use](../how-to/write-a-spec-jev-review-can-use.md). |
 | `implementation` | array of string | Yes | File paths making up the implementation bundle. At least one entry is required. |
 | `tests` | array of string | No | File paths making up the tests bundle. Omitted or empty is valid. |
 | `behaviors` | array of string | Yes | Behavior-description strings; each becomes one `covers_NN` question, in order. At least one entry is required. |
