@@ -352,8 +352,12 @@ type UnitReport struct {
 | `flags` | array of string | Always (may be empty) | One message per threshold crossed. A message matching an accepted entry has `" (accepted)"` appended and does not make the unit failing. |
 | `notes` | array of string | omitempty | Copied from the unit's `notes` in the config. |
 | `stale_acceptances` | array of string | omitempty | Entries from the unit's `accepted` list whose corresponding flag did not fire on this run, sorted. |
-| `failing` | bool | Always | `true` when at least one unaccepted flag fired, or the unit errored (missing file, missing spec heading, API/transport failure, or the unit call exceeding `--unit-timeout`). |
+| `failing` | bool | Always | `true` when at least one unaccepted flag fired, or the unit errored (missing or unreadable spec document, missing implementation or test file, missing spec heading, API/transport failure, or the unit call exceeding `--unit-timeout`). |
 | `error` | string | omitempty | Set instead of most other fields when the unit could not complete. |
+
+A unit error, of any of the kinds listed above, ends only that unit. `Run`
+records it on that unit's `UnitReport` and continues with the remaining
+units.
 
 The report file is written by `jev review` to `--report` (default
 `jev-review-report.json`) as a JSON array of `UnitReport`, one entry per
