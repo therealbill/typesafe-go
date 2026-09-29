@@ -56,7 +56,7 @@ go mod init ticket-router
 Install the library:
 
 ```bash
-go get github.com/therealbill/typesafe-go
+go get github.com/therealbill/typesafe-go@latest
 ```
 
 Export your API key so `typesafe.NewClient()` can find it:

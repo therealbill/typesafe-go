@@ -1,134 +1,183 @@
 ---
 title: "How to Cut a Release"
-description: "Tag a version to trigger the GoReleaser-based release workflow, and know what it builds, names, and attaches to the GitHub release."
+description: "Run make release VERSION=vX.Y.Z to validate, tag, and push a release, and know what the resulting workflow builds and publishes."
 diataxis: how-to
 weight: 110
 ---
 
-**Goal**: Trigger a `jev` release by pushing a version tag, and know exactly
-what the automated pipeline builds and publishes from it.
+**Goal**: Cut a release with `make release VERSION=vX.Y.Z`, and know what
+that command checks, what the tag push triggers, and what ends up attached
+to the GitHub release.
 
 ## Prerequisites
 
 - Push access to the repository, with permission to push tags
-- A clean `main` (or the commit you intend to release) already merged
-- `jev version` already builds locally with `make build`, see
-  [How to Configure Logging](./configure-logging.md)'s `bin/jev` prerequisite
-  for confirming a local build works
+- A clean checkout of `main`, merged and pushed to `origin/main`
+- `make lint` and `make test` already pass locally, since `make release`
+  runs both and stops if either fails
+- No release has been cut from this repository yet, so every example below
+  uses a placeholder `vX.Y.Z`; substitute a real version when you run it
 
 ## Steps
 
-### 1. Choose a version and tag it
+### 1. Pick a version number
 
-Tags matching `v*` trigger the release workflow (`.github/workflows/release.yml`,
-`on: push: tags: ["v*"]`). Use a semantic version:
+This repository follows semantic versioning. While the library's public
+surface is still settling, versions stay `v0.x.y`; a `v1.0.0` marks that
+surface as stable. The `jev` CLI's own behavior is not what a major version
+bump protects, the Go library's public API is.
 
-```
-git tag v1.2.0
-git push origin v1.2.0
-```
+A version must match `^v[0-9]+\.[0-9]+\.[0-9]+$`, for example `v0.2.0` or
+`v1.4.3`. `make release` rejects anything else before doing anything.
 
-**Do not run these two commands as a rehearsal.** Pushing a real `v*` tag
-starts the release pipeline and publishes a GitHub release. The steps below
-describe what that push does; read them as reference.
-
-### 2. Know what the tag push kicks off
-
-The `release` workflow checks out full history (`fetch-depth: 0`, which
-GoReleaser needs to generate a changelog from git log), sets up Go from
-`go.mod`, and runs `goreleaser/goreleaser-action@v6` with
-`args: release --clean`, authenticated as `GITHUB_TOKEN`.
-
-### 3. Know what GoReleaser builds
-
-`.goreleaser.yaml` builds the `./cmd/jev` binary for `goos: [darwin,
-linux]` × `goarch: [amd64, arm64]` (four binaries) with `CGO_ENABLED=0`.
-Each build's `ldflags` inject the same two version symbols `make build` does
-locally:
+### 2. Run `make release` with that version
 
 ```
--X github.com/therealbill/typesafe-go/internal/version.Version={{ .Version }}
--X github.com/therealbill/typesafe-go/internal/version.Commit={{ .ShortCommit }}
+make release VERSION=vX.Y.Z
 ```
 
-`{{ .Version }}` comes from the tag (`v1.2.0` → `1.2.0`); `{{ .ShortCommit }}`
-is the short commit hash being tagged.
+Leaving `VERSION` off entirely also fails the format check, since the
+Makefile's default version string (derived from `git describe`) never
+matches `vX.Y.Z`. Running `make release` with no arguments is a safe way to
+confirm the target exists without doing anything.
 
-### 4. Know what gets attached to the GitHub release
+### 3. Know what each check does, in order
 
-Each of the four binaries is archived as a `.tar.gz`
-(`name_template: "jev_{{ .Version }}_{{ .Os }}_{{ .Arch }}"`), and a
-`checksums.txt` is generated over all of them (`checksum.name_template`).
-The GoReleaser action attaches every archive plus `checksums.txt` to the
-GitHub release it creates under `release.github.owner: therealbill`,
-`release.github.name: typesafe-go`, with the changelog generated from git
-log (`changelog.use: git`).
+`make release` runs these checks and actions in sequence, stopping at the
+first failure:
 
-### 5. Confirm the version a build reports, before and after a release
+1. Confirms `VERSION` matches `vX.Y.Z`.
+2. Confirms the working tree has no uncommitted changes
+   (`git status --porcelain` is empty).
+3. Confirms the current branch is `main`.
+4. Fetches `origin main` and confirms local `HEAD` matches `origin/main`
+   exactly, catching both a branch that's behind and one with unpushed
+   commits.
+5. Confirms the tag doesn't already exist locally.
+6. Confirms the tag doesn't already exist on `origin`.
+7. Runs `make lint test`.
+8. Creates an annotated tag: `git tag -a "vX.Y.Z" -m "typesafe-go vX.Y.Z"`.
+9. Pushes the tag: `git push origin "vX.Y.Z"`.
+10. Prints a confirmation line naming the version that was pushed.
 
-`jev version` prints `{"version": ..., "commit": ..., "go": ...}`.
-Locally, without a real tag in the repository's history, `Version` and
-`Commit` both fall back to the same short commit hash. `Makefile`'s
-`VERSION` is `git describe --tags --always --dirty`, which falls back to
-`git rev-parse --short HEAD` when there's no tag to describe from. Once a
-real `v*` tag exists and is checked out, `git describe` reports that tag
-instead, and GoReleaser's build reports its own `{{ .Version }}` the same
-way.
+Steps 8 and 9 are the only ones that change repository state. Everything
+before them only reads it.
+
+### 4. Know what the pushed tag triggers
+
+Any tag matching `v*` triggers the `release` workflow
+(`.github/workflows/release.yml`). It checks out full git history
+(`fetch-depth: 0`, which GoReleaser needs for its changelog), sets up Go
+from `go.mod`, and runs `goreleaser/goreleaser-action@v6` with
+`args: release --clean`, authenticated with the repository's own
+`GITHUB_TOKEN`.
+
+### 5. Know what GoReleaser builds and publishes
+
+`.goreleaser.yaml` builds `./cmd/jev` for `darwin` and `linux`, each for
+`amd64` and `arm64`: four binaries, all with `CGO_ENABLED=0`. Each build's
+ldflags set `internal/version.Version` to `{{ .Tag }}` (the full tag, for
+example `vX.Y.Z`) and `internal/version.Commit` to the short hash of the
+tagged commit.
+
+Each binary is archived as a `.tar.gz` named
+`jev_{{ .Version }}_{{ .Os }}_{{ .Arch }}`. GoReleaser's `.Version`
+variable strips the leading `v` from the tag, so tag `vX.Y.Z` produces
+`jev_X.Y.Z_darwin_amd64.tar.gz`, `jev_X.Y.Z_darwin_arm64.tar.gz`,
+`jev_X.Y.Z_linux_amd64.tar.gz`, and `jev_X.Y.Z_linux_arm64.tar.gz`. A
+`checksums.txt` covers all four. The GitHub release's changelog is
+generated from git log, and the release is published under
+github.com/therealbill/typesafe-go.
 
 ## Verify it works
 
-A real local build, run right now against this repository's current state
-(no release tag exists yet), prints:
+Watch the workflow run that the tag push triggered:
 
-```
-$ ./bin/jev version --pretty
-{
-  "commit": "359389b",
-  "go": "go1.27.1",
-  "version": "359389b"
-}
+```bash
+gh run watch $(gh run list --workflow release --limit 1 --json databaseId -q '.[0].databaseId') --exit-status
 ```
 
-Both `version` and `commit` are the same short commit hash. This is a
-**local development build**, not a release. A binary built by the release
-workflow from a `v1.2.0` tag would instead report `"version": "1.2.0"` with
-`"commit"` still the short hash of the tagged commit.
+Once it finishes, list the assets attached to the release:
 
-✅ You know what a tag push does before you do it, and what the resulting
-binary's `jev version` output should look like once it's a real release,
-not a local build.
+```bash
+gh release view vX.Y.Z --json assets -q '.assets[].name'
+```
+
+Expect four `.tar.gz` archives plus `checksums.txt`.
+
+Confirm the published binary installs and reports itself correctly:
+
+```bash
+go install github.com/therealbill/typesafe-go/cmd/jev@vX.Y.Z
+jev version
+```
+
+This reports `"version":"vX.Y.Z"` and `"source":"module"`. A binary
+downloaded from the release itself reports the same version string with
+`"source":"ldflags"` instead. The two differ because `go install` resolves
+the version from the module system's record of the tag, while a release
+binary has the version baked in at build time through ldflags.
+
+✅ The workflow run finished successfully, the release has four archives
+and a checksums file attached, and an installed binary reports the version
+you tagged.
 
 ## Troubleshooting
 
-### Problem: the workflow doesn't start after pushing a tag
-**Symptom**: no `release` run appears in GitHub Actions.
-**Cause**: the tag doesn't match the `v*` glob (`.github/workflows/release.yml`'s
-`on.push.tags`), or it was pushed to a fork, not this repository.
-**Solution**: confirm the tag name starts with `v` (`v1.2.0`, not `1.2.0`),
-and that `git push origin <tag>` targeted the real repository's remote.
+### Problem: `make release` fails immediately with a VERSION message
+**Symptom**: `release: VERSION must look like v1.2.3, got '...'`.
+**Cause**: `VERSION` was omitted, or doesn't match `vX.Y.Z` (no `v` prefix,
+extra characters, missing a segment).
+**Solution**: rerun with `VERSION=vX.Y.Z` in that exact three-segment form.
 
-### Problem: GoReleaser fails with a changelog or version error
-**Symptom**: the `goreleaser-action` step fails early, before any build.
-**Cause**: the checkout didn't use `fetch-depth: 0`, or the tag wasn't an
-annotated/lightweight tag reachable from the checked-out history. GoReleaser
-needs both to compute `{{ .Version }}` and the git-log
-changelog.
-**Solution**: this repository's workflow already sets `fetch-depth: 0`; if
-you're reproducing the build locally with `goreleaser release --clean`,
-make sure your local clone isn't shallow.
+### Problem: `make release` fails on the working tree or branch check
+**Symptom**: `release: working tree is not clean` or `release: not on main`.
+**Cause**: there are uncommitted changes, or the current branch isn't
+`main`.
+**Solution**: commit or stash the changes, or switch to `main`, then rerun.
 
-### Problem: `jev version` on a downloaded release binary still shows a raw commit hash instead of a version number
-**Symptom**: `"version"` doesn't look like `"1.2.0"`.
-**Cause**: you're running a binary built from a commit that wasn't
-tagged at build time, or ldflags weren't applied to that build.
-**Solution**: rebuild from a real `v*` tag through the release workflow, or
-locally with `git describe --tags` returning a real tag name. A local
-`make build` on an untagged commit always falls back to the short hash.
+### Problem: `make release` fails on the up-to-date check
+**Symptom**: `release: main is not up to date with origin/main`.
+**Cause**: local `main` is behind `origin/main`, or has commits
+`origin/main` doesn't have yet.
+**Solution**: pull or push as needed until local `HEAD` matches
+`origin/main`, then rerun.
+
+### Problem: `make release` fails because the tag already exists
+**Symptom**: `release: tag vX.Y.Z already exists locally` or `... already
+exists on origin`.
+**Cause**: that version was already tagged, locally or on the remote.
+**Solution**: pick a different, unused version, or delete the existing tag
+first if it was created in error (see below).
+
+### Problem: `make release` fails during `lint` or `test`
+**Symptom**: the command stops with lint or test output instead of
+reaching the tag step.
+**Cause**: `make lint test` failed, so no tag was created or pushed; the
+working tree still isn't in a state you'd want to release.
+**Solution**: fix the failure, confirm `make lint test` passes on its own,
+then rerun `make release VERSION=vX.Y.Z`.
+
+### Problem: the workflow fails after the tag was already pushed
+**Symptom**: `gh run watch` exits non-zero, or the release run shows
+failed in GitHub Actions.
+**Cause**: something in the GoReleaser build or publish step failed after
+`make release` already pushed the tag.
+**Solution**: delete the tag both locally and on the remote, fix the
+underlying problem, and retag:
+
+```bash
+git tag -d vX.Y.Z
+git push origin :refs/tags/vX.Y.Z
+```
+
+Then run `make release VERSION=vX.Y.Z` again.
 
 ## Next steps
 
-- [Review your codebase with Jev](./review-your-codebase-with-jev.md) before tagging, so a
-  release isn't cut on top of a known, un-accepted regression.
+- [Review your codebase with Jev](./review-your-codebase-with-jev.md) before
+  releasing, so a release isn't cut on top of a known, un-accepted
+  regression.
 
 ## See also
 

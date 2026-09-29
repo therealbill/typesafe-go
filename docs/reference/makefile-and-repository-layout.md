@@ -1,6 +1,6 @@
 ---
 title: "Makefile and Repository Layout"
-description: "The make targets from make help, one line per top-level directory and package, and every GitHub Actions workflow with its trigger."
+description: "The make targets from make help, what make release does, one line per top-level directory and package, and every GitHub Actions workflow with its trigger."
 diataxis: reference
 weight: 90
 ---
@@ -16,6 +16,7 @@ $ make help
   lint         Run gofmt check, go vet, and golangci-lint
   vuln         Run govulncheck
   build        Build bin/jev
+  release      Tag and push a release: make release VERSION=vX.Y.Z (runs lint and test first)
   integration  Run the live API test (needs TYPESAFE_API_KEY)
   review       Run jev review against this repository (needs TYPESAFE_API_KEY)
   docs         Build the site and check that every docs/ page is reachable and links resolve
@@ -23,6 +24,29 @@ $ make help
   site-serve   Serve the documentation site locally with live reload
   clean        Remove build outputs
 ```
+
+## `make release`
+
+`make release VERSION=vX.Y.Z` validates the repository state, then tags and
+pushes a release. It performs these checks and actions, in order:
+
+1. `VERSION` must match `^v[0-9]+\.[0-9]+\.[0-9]+$` (for example `v1.2.3`).
+2. The working tree must have no uncommitted changes.
+3. The current branch must be `main`.
+4. It fetches `origin main`, then requires local `HEAD` to match
+   `origin/main` exactly.
+5. The tag must not already exist locally.
+6. The tag must not already exist on the `origin` remote.
+7. It runs `make lint test`, which must pass.
+8. It creates an annotated tag: `git tag -a "VERSION" -m "typesafe-go VERSION"`.
+9. It pushes the tag: `git push origin "VERSION"`.
+10. It prints a confirmation line.
+
+Pushing the tag triggers the `release.yml` GitHub Actions workflow, described
+under [`release.yml`](#releaseyml-name-release) below.
+
+For the full release procedure and what GoReleaser produces from the tag,
+see [Cut a release](../how-to/cut-a-release.md).
 
 ## Repository layout
 

@@ -44,7 +44,7 @@ go mod init first-judgment
 Install the library:
 
 ```bash
-go get github.com/therealbill/typesafe-go
+go get github.com/therealbill/typesafe-go@latest
 ```
 
 Now export your API key so the library can find it. `typesafe.NewClient()`

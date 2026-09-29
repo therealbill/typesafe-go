@@ -291,11 +291,11 @@ git commit -m "Add make release target and report tags as versions"
 **Files:**
 - Modify: `README.md`, `docs/how-to/cut-a-release.md`, `docs/reference/jev-cli.md`, `docs/reference/makefile-and-repository-layout.md`, `docs/tutorials/jev-from-the-command-line.md`, `docs/tutorials/first-judgment-in-go.md`, `docs/tutorials/build-a-ticket-router.md`, `docs/reference/client-options-and-environment.md`, `docs/explanation/the-agent-facing-cli-contract.md` (only if it describes `version`)
 
-- [ ] **Step 1: README install section**
+- [x] **Step 1: README install section**
 
 Replace the `## Install` section with the text in the spec's Documentation section. Keep the rest of the README.
 
-- [ ] **Step 2: Pages**
+- [x] **Step 2: Pages**
 
 Run `make build` and `go build -o /tmp/jev-plain ./cmd/jev` first so both `version` outputs are real. Dispatch the how-to and reference writers with the plan's prose rubric and these facts, all verified against `Makefile`, `.goreleaser.yaml`, `.github/workflows/release.yml`, and `internal/version/version.go`:
 
@@ -305,7 +305,7 @@ Run `make build` and `go build -o /tmp/jev-plain ./cmd/jev` first so both `versi
 - `jev-from-the-command-line.md`: install via `go install github.com/therealbill/typesafe-go/cmd/jev@latest` as the primary path (state that it needs Go 1.25 or newer and that the binary lands in `$(go env GOPATH)/bin`), `make build` as the alternative; re-capture the `jev version` step's output from the `make build` binary.
 - The two Go tutorials and the client-options reference: `go get github.com/therealbill/typesafe-go@latest` wherever the install line appears.
 
-- [ ] **Step 3: Validate and commit**
+- [x] **Step 3: Validate and commit**
 
 ```bash
 make docs && echo "docs ok"

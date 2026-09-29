@@ -44,23 +44,23 @@ Use "jev [command] --help" for more information about a command.
 
 ### `-v`, `--version` (global flag) versus `jev version` (subcommand)
 
-The root command declares `Version: version.Version`, which makes Cobra
+The root command sets `Version: version.Get().Version`, which makes Cobra
 auto-provide a `-v`/`--version` flag on `jev` itself. That flag differs from
 the `jev version` subcommand:
 
 | | `jev --version` / `jev -v` | `jev version` |
 |---|---|---|
 | Kind | Global flag on the root command | Subcommand |
-| Output | One line: `jev version <string>` | A JSON object: `{"version":...,"commit":...,"go":...}` |
+| Output | One line: `jev version <string>` | A JSON object with five fields: `{"version":...,"commit":...,"modified":...,"source":...,"go":...}` |
 | Exit code | 0 | 0 |
 
-The `<string>` is `internal/version.Version`, the same build-time value
-reported by the `version` field of the `jev version` subcommand (see below).
-Verified against the built binary:
+The `<string>` is the `Version` field of `version.Get()`'s result, the same
+resolved value reported by the `version` field of the `jev version`
+subcommand (see below). Verified against the built binary:
 
 ```
 $ ./bin/jev --version
-jev version 6d0a13c
+jev version 0556925
 ```
 
 ## Global flags
@@ -397,23 +397,43 @@ Global Flags:
       --trace              force OpenTelemetry tracing on
 ```
 
-No command-specific flags. Makes no network call. Prints:
+No command-specific flags. Makes no network call. Prints five fields:
 
 ```json
-{ "version": "...", "commit": "...", "go": "..." }
+{ "version": "...", "commit": "...", "modified": ..., "source": "...", "go": "..." }
 ```
 
-`version` and `commit` are both the `internal/version` package's `Version`/`Commit` values, set by the build: the Makefile's `build` target injects them via `-ldflags` from `git describe --tags --always --dirty` and `git rev-parse --short HEAD`; a plain `go build` leaves the package defaults, `"dev"` and `"none"`. `go` is the value of `runtime.Version()`. Because this is encoded from a Go `map[string]string`, `encoding/json` emits the keys in alphabetical order (`commit`, `go`, `version`), independent of `--pretty`. Verified against the built binary:
+`internal/version.Get()` resolves these values in order:
+
+1. If the ldflags-set `Version` variable is not `"dev"`, it is used as-is, with the ldflags-set `Commit`. `Source` is `"ldflags"`. Both `make build` and the release binaries GoReleaser builds produce this, since both inject `Version` and `Commit` via `-ldflags`.
+2. Otherwise, `runtime/debug.ReadBuildInfo()` is consulted. If the main module's recorded `Version` is set and is not `"(devel)"`, that value is used as `Version`. `Source` is `"module"`. `Commit` is the first 7 characters of the build's `vcs.revision` setting, or `"none"` if that setting is absent. A plain `go build` in a git clone produces this, as does `go install .../jev@vX.Y.Z`: Go 1.24 and newer stamp the main module's version from the VCS commit automatically, even with no tag (producing a pseudo-version like `v0.0.0-<timestamp>-<commit>`), or from the exact tag when one is given to `go install`.
+3. Otherwise, if a `vcs.revision` build setting is present but the module version is empty or `"(devel)"`, `Version` is `"(devel)"` and `Commit` is the short revision. `Source` is `"vcs"`. This is the fallback for a build whose module version is `"(devel)"`.
+4. Otherwise `Version` is `"dev"` and `Commit` is `"none"`. `Source` is `"unknown"`: the binary has no module or VCS information available to it at all.
+
+`Modified` is `true` when the build's `vcs.modified` setting is `"true"`, meaning an uncommitted change was present in the tree at build time. It is only ever populated from that build setting, in cases 2 and 3 above. A `"ldflags"`-sourced build (case 1: `make build`, or a GoReleaser release binary) always reports `modified: false`, regardless of whether the tree was actually clean, because dirty-tree state is not threaded through ldflags.
+
+`go` is the value of `runtime.Version()`. Because this is encoded from a Go map, `encoding/json` emits the keys in alphabetical order (`commit`, `go`, `modified`, `source`, `version`), independent of `--pretty`.
+
+Verified against the built binary, from an ldflags build at commit `0556925` with a clean tree:
 
 ```
 $ ./bin/jev version
-{"commit":"6d0a13c","go":"go1.27.1","version":"6d0a13c"}
+{"commit":"0556925","go":"go1.27.1","modified":false,"source":"ldflags","version":"0556925"}
 $ ./bin/jev --pretty version
 {
-  "commit": "6d0a13c",
+  "commit": "0556925",
   "go": "go1.27.1",
-  "version": "6d0a13c"
+  "modified": false,
+  "source": "ldflags",
+  "version": "0556925"
 }
+```
+
+A plain `go build` outside any release, at the same commit and clean tree, reports the module source instead:
+
+```
+$ go build -o /tmp/jev-plain ./cmd/jev && /tmp/jev-plain version
+{"commit":"0556925","go":"go1.27.1","modified":false,"source":"module","version":"v0.0.0-20260929193359-05569256a11c"}
 ```
 
 ## Telemetry

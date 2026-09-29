@@ -42,6 +42,18 @@ type it on the command line.
 
 ## Step 1: Build the binary
 
+Most people install `jev` directly, without cloning this repository:
+
+```bash
+go install github.com/therealbill/typesafe-go/cmd/jev@latest
+```
+
+This needs Go 1.25 or newer. The binary lands at `$(go env GOPATH)/bin`.
+
+This tutorial builds from a clone instead, using `make build`, because its
+purpose is to walk through the repository itself. Every command in the rest
+of this tutorial invokes the exact binary this produces, `./bin/jev`.
+
 From the repository root, run:
 
 ```bash
@@ -76,19 +88,23 @@ Run:
 ```
 
 ```json
-{"commit":"a48152b","go":"go1.27.1","version":"a48152b"}
+{"commit":"0556925","go":"go1.27.1","modified":false,"source":"ldflags","version":"0556925"}
 ```
 
-Three fields, always in alphabetical order because they come from a Go map:
-`commit`, `go`, and `version`. `go` is the Go toolchain version this binary
-was built with. For why `version` and `commit` are identical here, see the
-[jev CLI reference](../reference/jev-cli.md#jev-version).
+Five fields, always in alphabetical order because they come from a Go map:
+`commit`, `go`, `modified`, `source`, and `version`. `go` is the Go
+toolchain version this binary was built with. `modified` is a bool: `true`
+when the build came from a tree with uncommitted changes, `false` here
+because the tree was clean. `source` says where `version` came from; for a
+`make build` like this one, it's `"ldflags"`. The full explanation of all
+four possible `source` values, and why `version` and `commit` are identical
+here, is on the [jev CLI reference](../reference/jev-cli.md#jev-version).
 
 ### Checkpoint
 
-You should see a JSON object with exactly these three keys and no error.
-If you instead see a `command not found` error, you're not running the
-binary from the repository root. Use `./bin/jev`, not `jev`.
+You should see a JSON object with exactly these five keys and no error. If
+you instead see a `command not found` error, you're not running the binary
+from the repository root. Use `./bin/jev`, not `jev`.
 
 ## Step 3: List available models
 
