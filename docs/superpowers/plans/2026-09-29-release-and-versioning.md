@@ -239,7 +239,7 @@ Expected: `make build` output shows `"source":"ldflags"`; the plain build shows 
 **Files:**
 - Modify: `Makefile`, `.goreleaser.yaml`
 
-- [ ] **Step 1: Add the target**
+- [x] **Step 1: Add the target**
 
 Add `release` to `.PHONY` and this target after `build`:
 
@@ -260,11 +260,11 @@ release: ## Tag and push a release: make release VERSION=vX.Y.Z (runs lint and t
 
 `VERSION` is already a Makefile variable (defaulting to `git describe`), so `make release` without `VERSION=` fails the format check, which is the intended behavior.
 
-- [ ] **Step 2: goreleaser uses the tag as the version string**
+- [x] **Step 2: goreleaser uses the tag as the version string**
 
 In `.goreleaser.yaml`, change the ldflags line for `Version` to use `{{ .Tag }}` instead of `{{ .Version }}`, so binaries report `v0.1.0` exactly as `go install` builds do.
 
-- [ ] **Step 3: Verify the guard rails without tagging**
+- [x] **Step 3: Verify the guard rails without tagging**
 
 ```bash
 make release VERSION=bad 2>&1 | tail -1; echo "exit $?"
@@ -275,7 +275,7 @@ make help | grep release
 ```
 Expected: "VERSION must look like v1.2.3" then "working tree is not clean"; goreleaser `check` passes; help lists `release`. Do not run `make release` with a valid version; the lead cuts the tag in Task 4.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add Makefile .goreleaser.yaml
