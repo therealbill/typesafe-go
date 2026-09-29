@@ -1439,7 +1439,7 @@ Expected: `docs ok` with only the excludeFiles deprecation warning. Report the v
 
 **Agent:** lead (after Tasks 3 and 5)
 
-- [ ] **Step 1: Gate**
+- [x] **Step 1: Gate**
 
 ```bash
 make lint && make test && make docs && git status --short && echo "(clean)"
@@ -1447,7 +1447,7 @@ make lint && make test && make docs && git status --short && echo "(clean)"
 ```
 Expected: all pass; second init exits 1.
 
-- [ ] **Step 2: Push and verify**
+- [x] **Step 2: Push and verify**
 
 ```bash
 git push origin main
@@ -1458,4 +1458,4 @@ curl -fsS https://therealbill.github.io/typesafe-go/docs/how-to/run-the-self-rev
 ```
 Expected: deploy success; new page title; the old URL returns 200 with a meta refresh to the new page.
 
-- [ ] **Step 3: Tick the plan, commit, push, report.**
+- [x] **Step 3: Tick the plan, commit, push, report.**
