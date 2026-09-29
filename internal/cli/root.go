@@ -38,7 +38,7 @@ func NewRootCmd(streams IO, getenv func(string) string) *cobra.Command {
 		Use:           "jev",
 		Short:         "Ask TypeSafe's Jev model typed questions from the command line",
 		Long:          "jev sends a state and a set of typed questions (noul, choice, score) to the TypeSafe System One API and prints the answers as JSON.",
-		Version:       version.Version,
+		Version:       version.Get().Version,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}

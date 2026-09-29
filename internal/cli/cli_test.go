@@ -247,6 +247,9 @@ func TestVersion(t *testing.T) {
 	if code != ExitOK || !strings.Contains(out, `"version"`) || !strings.Contains(out, `"go"`) {
 		t.Fatalf("exit %d out %s", code, out)
 	}
+	if !strings.Contains(out, `"source"`) || !strings.Contains(out, `"modified"`) {
+		t.Fatalf("out %s must report the resolution source and the dirty flag", out)
+	}
 }
 
 func TestUnknownCommandIsUsage(t *testing.T) {
@@ -419,8 +422,8 @@ func TestVersionFlag(t *testing.T) {
 	if code != ExitOK {
 		t.Fatalf("exit %d stderr %s", code, errOut)
 	}
-	if !strings.Contains(out, version.Version) {
-		t.Fatalf("stdout %q must contain the version %q", out, version.Version)
+	if want := version.Get().Version; !strings.Contains(out, want) {
+		t.Fatalf("stdout %q must contain the version %q", out, want)
 	}
 }
 

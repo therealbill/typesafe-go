@@ -15,10 +15,13 @@ func newVersionCmd(streams IO) *cobra.Command {
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			pretty, _ := cmd.Flags().GetBool("pretty")
-			return writeJSON(streams.Out, map[string]string{
-				"version": version.Version,
-				"commit":  version.Commit,
-				"go":      runtime.Version(),
+			info := version.Get()
+			return writeJSON(streams.Out, map[string]any{
+				"version":  info.Version,
+				"commit":   info.Commit,
+				"modified": info.Modified,
+				"source":   info.Source,
+				"go":       runtime.Version(),
 			}, pretty)
 		},
 	}
