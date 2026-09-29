@@ -32,7 +32,7 @@ Rules are the same as the previous plans: main branch, explicit-path staging, th
 - Modify: `internal/version/version.go`, `internal/cli/version.go`, `internal/cli/root.go`, `internal/cli/cli_test.go`
 - Create: `internal/version/version_test.go`
 
-- [ ] **Step 1: Write the failing tests `internal/version/version_test.go`**
+- [x] **Step 1: Write the failing tests `internal/version/version_test.go`**
 
 ```go
 package version
@@ -107,14 +107,14 @@ func TestGetUnknown(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 ```bash
 go test ./internal/version/ 2>&1 | head -3
 ```
 Expected: undefined `Get`, `readBuildInfo`.
 
-- [ ] **Step 3: Replace `internal/version/version.go`**
+- [x] **Step 3: Replace `internal/version/version.go`**
 
 ```go
 // Package version reports how the binary was built.
@@ -181,7 +181,7 @@ func Get() Info {
 }
 ```
 
-- [ ] **Step 4: Use it in the CLI**
+- [x] **Step 4: Use it in the CLI**
 
 `internal/cli/version.go`:
 
@@ -218,7 +218,7 @@ func newVersionCmd(streams IO) *cobra.Command {
 
 In `internal/cli/root.go`, set `root.Version = version.Get().Version` (replacing `version.Version`). In `internal/cli/cli_test.go`, the `--version` test compares against `version.Get().Version`, and `TestVersion` additionally asserts `"source"` and `"modified"` appear.
 
-- [ ] **Step 5: Verify and commit**
+- [x] **Step 5: Verify and commit**
 
 ```bash
 go test -race ./internal/version/ ./internal/cli/ 2>&1 | tail -3
