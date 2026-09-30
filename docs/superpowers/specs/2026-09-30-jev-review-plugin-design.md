@@ -258,17 +258,21 @@ including, the API call.
   `opts.DryRun` is set it returns there, with `Failing` false, and never
   touches the asker. Errors before that point (unreadable spec, missing
   heading, missing file) are recorded as today.
-- `Run` accepts a nil asker when `opts.DryRun` is set, and sets a new
-  `Report.DryRun bool` field, excluded from JSON, that `Markdown` reads.
-- `Markdown` in dry-run mode prints `# jev review --dry-run` and a table:
+- `Run` accepts a nil asker when `opts.DryRun` is set and returns an error
+  for a nil asker otherwise. It sets a new `Report.DryRun bool` field, not
+  part of the JSON document, that `Markdown` reads.
+- `Markdown` in dry-run mode prints `# jev review --dry-run`, a line
+  `budget: N bytes each for implementation and tests`, and a table:
 
-  | Unit | Spec | Heading | Implementation | Tests | Bytes | Status |
-  |---|---|---|---|---|---|---|
+  | Unit | Spec bytes | Implementation bytes | Tests bytes | Truncated | Status |
+  |---|---|---|---|---|---|
 
-  `Bytes` is `implementation/tests`. `Status` is `ok`, `ok (truncated)`, or
-  `error`. Below the table, one `## <unit>` section per errored unit with
-  `error: <message>`, and one per truncated unit with the existing
-  `note: sources were truncated to fit the state budget` line.
+  `Truncated` is `yes` or `no`. `Status` is `ok` or `error`. Below the
+  table, one `## <unit>` section per errored unit with `error: <message>`,
+  and one per truncated unit with the existing
+  `note: sources were truncated to fit the state budget` line. The table
+  shows only what `UnitReport` carries, so the report schema gains nothing
+  beyond the three byte fields.
 
 ### Subcommand
 
