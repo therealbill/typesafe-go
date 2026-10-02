@@ -59,6 +59,9 @@ type Options struct {
 	MaxContradict float64
 	MinThorough   float64
 	UnitTimeout   time.Duration
+	// DryRun stops each unit after its spec section and file bundles are
+	// built, before the API call. Run accepts a nil Asker when it is set.
+	DryRun bool
 }
 
 // DefaultOptions returns the thresholds and limits used when none are given.
@@ -80,28 +83,36 @@ type BehaviorResult struct {
 
 // UnitReport is the outcome for one unit.
 type UnitReport struct {
-	Name             string           `json:"name"`
-	RequestID        string           `json:"request_id,omitempty"`
-	Model            string           `json:"model,omitempty"`
-	InputTokens      int              `json:"input_tokens,omitempty"`
-	Truncated        bool             `json:"truncated"`
-	Behaviors        []BehaviorResult `json:"behaviors"`
-	Contradicts      float64          `json:"contradicts_spec"`
-	Thoroughness     float64          `json:"thoroughness"`
-	ThoroughConf     float64          `json:"thoroughness_confidence"`
-	Weakest          string           `json:"weakest_area"`
-	WeakestConf      float64          `json:"weakest_confidence"`
-	Flags            []string         `json:"flags"`
-	Notes            []string         `json:"notes,omitempty"`
-	StaleAcceptances []string         `json:"stale_acceptances,omitempty"`
-	Failing          bool             `json:"failing"`
-	Error            string           `json:"error,omitempty"`
-	err              error
+	Name        string `json:"name"`
+	RequestID   string `json:"request_id,omitempty"`
+	Model       string `json:"model,omitempty"`
+	InputTokens int    `json:"input_tokens,omitempty"`
+	Truncated   bool   `json:"truncated"`
+	// SpecBytes is the length of the extracted spec section.
+	// ImplementationBytes and TestsBytes are the bundle sizes before
+	// truncation, so a report shows how close a unit sits to the budget.
+	SpecBytes           int              `json:"spec_bytes,omitempty"`
+	ImplementationBytes int              `json:"implementation_bytes,omitempty"`
+	TestsBytes          int              `json:"tests_bytes,omitempty"`
+	Behaviors           []BehaviorResult `json:"behaviors"`
+	Contradicts         float64          `json:"contradicts_spec"`
+	Thoroughness        float64          `json:"thoroughness"`
+	ThoroughConf        float64          `json:"thoroughness_confidence"`
+	Weakest             string           `json:"weakest_area"`
+	WeakestConf         float64          `json:"weakest_confidence"`
+	Flags               []string         `json:"flags"`
+	Notes               []string         `json:"notes,omitempty"`
+	StaleAcceptances    []string         `json:"stale_acceptances,omitempty"`
+	Failing             bool             `json:"failing"`
+	Error               string           `json:"error,omitempty"`
+	err                 error
 }
 
-// Report is the outcome of a run.
+// Report is the outcome of a run. DryRun records that the units stopped
+// before the API call; it is not part of the JSON document.
 type Report struct {
-	Units []UnitReport
+	Units  []UnitReport
+	DryRun bool
 }
 
 // Failing reports whether any unit has an unaccepted flag or an error.
@@ -242,10 +253,13 @@ func resolve(base, p string) string {
 // Run evaluates every unit (or the one named by opts.Only) and returns the
 // report. Errors reading a spec document, reading files, or finding a spec
 // section, API failures, and timeouts are recorded on the unit; Run itself
-// fails only when no unit matched.
+// fails only when no unit matched or when asker is nil outside a dry run.
 func Run(ctx context.Context, cfg *Config, base string, asker Asker, opts Options) (Report, error) {
+	rep := Report{DryRun: opts.DryRun}
+	if asker == nil && !opts.DryRun {
+		return rep, errors.New("review: an Asker is required unless Options.DryRun is set")
+	}
 	specs := newSpecCache(base)
-	var rep Report
 	for _, u := range cfg.Units {
 		if opts.Only != "" && u.Name != opts.Only {
 			continue
@@ -284,9 +298,13 @@ func runUnit(ctx context.Context, u Unit, specs *specCache, defaultSpec, base st
 		files[p] = string(b)
 	}
 	half := opts.MaxStateBytes / 2
-	impl, t1 := bundle(u.Implementation, files, half)
-	tests, t2 := bundle(u.Tests, files, half)
-	truncated := t1 || t2
+	impl, implSize, t1 := bundle(u.Implementation, files, half)
+	tests, testsSize, t2 := bundle(u.Tests, files, half)
+	r.SpecBytes, r.ImplementationBytes, r.TestsBytes = len(section), implSize, testsSize
+	r.Truncated = t1 || t2
+	if opts.DryRun {
+		return r
+	}
 
 	state := map[string]any{"spec": section, "implementation": impl, "tests": tests}
 	questions := typesafe.Questions{}
@@ -312,7 +330,8 @@ func runUnit(ctx context.Context, u Unit, specs *specCache, defaultSpec, base st
 	if res.Usage.InputTokens != nil {
 		out.InputTokens = *res.Usage.InputTokens
 	}
-	out.Truncated = truncated
+	out.Truncated = r.Truncated
+	out.SpecBytes, out.ImplementationBytes, out.TestsBytes = r.SpecBytes, r.ImplementationBytes, r.TestsBytes
 	return out
 }
 
@@ -353,8 +372,8 @@ func extractSection(spec, heading string) (string, error) {
 }
 
 // bundle concatenates files with a header line each, cutting the total to
-// maxBytes and marking the cut.
-func bundle(paths []string, files map[string]string, maxBytes int) (string, bool) {
+// maxBytes and marking the cut. size is the length before any cut.
+func bundle(paths []string, files map[string]string, maxBytes int) (text string, size int, truncated bool) {
 	var b strings.Builder
 	for _, p := range paths {
 		b.WriteString("// file: " + filepath.ToSlash(p) + "\n")
@@ -363,9 +382,9 @@ func bundle(paths []string, files map[string]string, maxBytes int) (string, bool
 	}
 	s := b.String()
 	if len(s) <= maxBytes {
-		return s, false
+		return s, len(s), false
 	}
-	return s[:maxBytes] + truncatedMarker, true
+	return s[:maxBytes] + truncatedMarker, len(s), true
 }
 
 func buildQuestions(u Unit) map[string]map[string]any {
@@ -483,6 +502,9 @@ func missing(answers map[string]typesafe.Answer, id, want string) string {
 
 // Markdown renders the summary table and the flagged units.
 func (r Report) Markdown(opts Options) string {
+	if r.DryRun {
+		return r.dryRunMarkdown(opts)
+	}
 	var b strings.Builder
 	b.WriteString("# jev review\n\n| Unit | Behaviors covered | Contradicts | Thoroughness | Weakest | Flags |\n|---|---|---|---|---|---|\n")
 	for _, u := range r.Units {
@@ -529,6 +551,31 @@ func (r Report) Markdown(opts Options) string {
 			b.WriteString("- acceptance did not fire: " + a + "\n")
 		}
 		b.WriteString("\n")
+	}
+	return b.String()
+}
+
+// dryRunMarkdown renders the sizes and status of every unit in a dry run.
+func (r Report) dryRunMarkdown(opts Options) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# jev review --dry-run\n\nbudget: %d bytes each for implementation and tests\n\n", opts.MaxStateBytes/2)
+	b.WriteString("| Unit | Spec bytes | Implementation bytes | Tests bytes | Truncated | Status |\n|---|---|---|---|---|---|\n")
+	yesNo := map[bool]string{true: "yes", false: "no"}
+	for _, u := range r.Units {
+		status := "ok"
+		if u.Error != "" {
+			status = "error"
+		}
+		fmt.Fprintf(&b, "| %s | %d | %d | %d | %s | %s |\n", u.Name, u.SpecBytes, u.ImplementationBytes, u.TestsBytes, yesNo[u.Truncated], status)
+	}
+	b.WriteString("\n")
+	for _, u := range r.Units {
+		switch {
+		case u.Error != "":
+			fmt.Fprintf(&b, "## %s\n\nerror: %s\n\n", u.Name, u.Error)
+		case u.Truncated:
+			fmt.Fprintf(&b, "## %s\n\nnote: sources were truncated to fit the state budget\n\n", u.Name)
+		}
 	}
 	return b.String()
 }

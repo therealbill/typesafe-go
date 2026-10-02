@@ -72,13 +72,14 @@ func TestBuildQuestions(t *testing.T) {
 
 func TestBundleTruncates(t *testing.T) {
 	files := map[string]string{"a.go": strings.Repeat("x", 100), "b.go": strings.Repeat("y", 100)}
-	text, truncated := bundle([]string{"a.go", "b.go"}, files, 150)
-	if !truncated || len(text) > 150+len(truncatedMarker)*2+40 {
-		t.Fatalf("truncated=%v len=%d", truncated, len(text))
+	text, size, truncated := bundle([]string{"a.go", "b.go"}, files, 150)
+	// Each file is "// file: a.go\n" (14 bytes) + 100 + "\n\n".
+	if !truncated || size != 232 || len(text) > 150+len(truncatedMarker)*2+40 {
+		t.Fatalf("truncated=%v size=%d len=%d", truncated, size, len(text))
 	}
-	text, truncated = bundle([]string{"a.go"}, files, 1000)
-	if truncated || !strings.Contains(text, "// file: a.go") {
-		t.Fatalf("truncated=%v text=%q", truncated, text)
+	text, size, truncated = bundle([]string{"a.go"}, files, 1000)
+	if truncated || size != len(text) || !strings.Contains(text, "// file: a.go") {
+		t.Fatalf("truncated=%v size=%d text=%q", truncated, size, text)
 	}
 }
 
@@ -478,5 +479,152 @@ func TestRunMissingSpecIsUnitError(t *testing.T) {
 	}
 	if len(fa.states) != 0 {
 		t.Fatalf("no unit should call: %d", len(fa.states))
+	}
+}
+
+// refuseAsker fails the test if the review calls it.
+type refuseAsker struct{ t *testing.T }
+
+func (r refuseAsker) SystemOne(context.Context, any, typesafe.Questions, ...typesafe.RequestOption) (*typesafe.SystemOneResponse, error) {
+	r.t.Fatal("the asker must not be called in a dry run")
+	return nil, nil
+}
+
+func dryRunOptions() Options {
+	o := DefaultOptions()
+	o.DryRun = true
+	return o
+}
+
+func TestRunDryRunStopsBeforeTheCall(t *testing.T) {
+	dir := t.TempDir()
+	write := func(name, body string) {
+		t.Helper()
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("spec.md", "# S\n\n## Retry\n\nretry text\n\n## Other\n\nx\n")
+	write("retry.go", strings.Repeat("a", 30))
+	write("retry_test.go", strings.Repeat("b", 20))
+	cfg := &Config{Spec: "spec.md", Units: []Unit{{Name: "retry", SpecHeading: "## Retry", Implementation: []string{"retry.go"}, Tests: []string{"retry_test.go"}, Behaviors: []string{"b0"}, Notes: []string{"n"}}}}
+	rep, err := Run(context.Background(), cfg, dir, refuseAsker{t}, dryRunOptions())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !rep.DryRun || len(rep.Units) != 1 {
+		t.Fatalf("report %+v", rep)
+	}
+	u := rep.Units[0]
+	if u.Failing || u.Error != "" || u.RequestID != "" || u.Behaviors != nil {
+		t.Fatalf("a clean dry run carries no failure and no answers: %+v", u)
+	}
+	// The section is "## Retry\n\nretry text\n" (21 bytes). Each bundle is
+	// "// file: <name>\n" + body + "\n\n": 18+30+2 and 23+20+2.
+	if u.SpecBytes != 21 || u.ImplementationBytes != 50 || u.TestsBytes != 45 || u.Truncated {
+		t.Fatalf("sizes: spec %d impl %d tests %d truncated %v", u.SpecBytes, u.ImplementationBytes, u.TestsBytes, u.Truncated)
+	}
+	if len(u.Notes) != 1 {
+		t.Fatalf("notes must travel into the dry-run report: %+v", u)
+	}
+}
+
+func TestRunDryRunAcceptsNilAskerAndRejectsItOtherwise(t *testing.T) {
+	_, p := setupRepo(t)
+	cfg, base, err := Load(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Run(context.Background(), cfg, base, nil, dryRunOptions()); err != nil {
+		t.Fatalf("a nil asker must be accepted in a dry run: %v", err)
+	}
+	if _, err := Run(context.Background(), cfg, base, nil, defaults()); err == nil {
+		t.Fatal("a nil asker must be rejected outside a dry run")
+	}
+}
+
+func TestRunDryRunRecordsUnitErrors(t *testing.T) {
+	dir, _ := setupRepo(t)
+	cfg := &Config{Spec: "spec.md", Units: []Unit{
+		{Name: "heading", SpecHeading: "## Missing", Implementation: []string{"retry.go"}, Behaviors: []string{"b0"}},
+		{Name: "file", SpecHeading: "## Retry", Implementation: []string{"nope.go"}, Behaviors: []string{"b0"}},
+		{Name: "doc", Spec: "nope.md", SpecHeading: "## Retry", Implementation: []string{"retry.go"}, Behaviors: []string{"b0"}},
+	}}
+	rep, err := Run(context.Background(), cfg, dir, nil, dryRunOptions())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !rep.Failing() {
+		t.Fatal("unit errors must fail the dry run")
+	}
+	for i, want := range []string{`heading "## Missing" not found`, "nope.go", "nope.md"} {
+		u := rep.Units[i]
+		if !u.Failing || !strings.Contains(u.Error, want) {
+			t.Fatalf("unit %s: %+v", u.Name, u)
+		}
+	}
+}
+
+func TestRunDryRunReportsSizesBeforeTruncation(t *testing.T) {
+	dir, _ := setupRepo(t)
+	if err := os.WriteFile(filepath.Join(dir, "big.go"), []byte(strings.Repeat("x", 300)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg := &Config{Spec: "spec.md", Units: []Unit{{Name: "big", SpecHeading: "## Retry", Implementation: []string{"big.go"}, Behaviors: []string{"b0"}}}}
+	o := dryRunOptions()
+	o.MaxStateBytes = 100
+	rep, err := Run(context.Background(), cfg, dir, nil, o)
+	if err != nil {
+		t.Fatal(err)
+	}
+	u := rep.Units[0]
+	// "// file: big.go\n" (16 bytes) + 300 + "\n\n".
+	if !u.Truncated || u.ImplementationBytes != 318 || u.TestsBytes != 0 || u.Failing {
+		t.Fatalf("%+v", u)
+	}
+}
+
+func TestRunCarriesSizesIntoRealReports(t *testing.T) {
+	_, p := setupRepo(t)
+	cfg, base, _ := Load(p)
+	fa := &fakeAsker{answers: answers([]float64{0.9}, 0.1, 2.5, 0.8, "none")}
+	rep, err := Run(context.Background(), cfg, base, fa, defaults())
+	if err != nil {
+		t.Fatal(err)
+	}
+	u := rep.Units[0]
+	if rep.DryRun || u.SpecBytes == 0 || u.ImplementationBytes == 0 || u.TestsBytes == 0 {
+		t.Fatalf("sizes must be set on a real run: %+v", u)
+	}
+	fa.err = errors.New("boom")
+	rep, _ = Run(context.Background(), cfg, base, fa, defaults())
+	if rep.Units[0].ImplementationBytes == 0 {
+		t.Fatalf("sizes must survive a call error: %+v", rep.Units[0])
+	}
+}
+
+func TestDryRunMarkdown(t *testing.T) {
+	rep := Report{DryRun: true, Units: []UnitReport{
+		{Name: "retry", SpecBytes: 21, ImplementationBytes: 50, TestsBytes: 45},
+		{Name: "big", SpecBytes: 21, ImplementationBytes: 318, Truncated: true},
+		{Name: "cache", Error: `heading "## Eviction" not found in spec`, Failing: true},
+	}}
+	out := rep.Markdown(defaults())
+	for _, want := range []string{
+		"# jev review --dry-run\n",
+		"budget: 50000 bytes each for implementation and tests\n",
+		"| Unit | Spec bytes | Implementation bytes | Tests bytes | Truncated | Status |\n",
+		"| retry | 21 | 50 | 45 | no | ok |\n",
+		"| big | 21 | 318 | 0 | yes | ok |\n",
+		"| cache | 0 | 0 | 0 | no | error |\n",
+		"## big\n\nnote: sources were truncated to fit the state budget\n",
+		"## cache\n\nerror: heading \"## Eviction\" not found in spec\n",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("missing %q in:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "## retry") {
+		t.Fatalf("a clean unit gets no section:\n%s", out)
 	}
 }

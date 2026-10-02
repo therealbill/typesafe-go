@@ -72,7 +72,7 @@ Tasks 3, 8, 9 → Task 10                                (lead)
 
 Read `internal/review/review.go` in full first. The change: `Options.DryRun`, three size fields on `UnitReport`, `Report.DryRun`, `bundle` returning the pre-truncation size, `runUnit` returning before the call in dry-run mode, `Run` rejecting a nil asker outside dry-run mode, and a dry-run variant of `Markdown`.
 
-- [ ] **Step 1: Update `TestBundleTruncates` for the new `bundle` signature**
+- [x] **Step 1: Update `TestBundleTruncates` for the new `bundle` signature**
 
 Replace the existing function in `internal/review/review_test.go`:
 
@@ -91,7 +91,7 @@ func TestBundleTruncates(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Append the dry-run tests to `internal/review/review_test.go`**
+- [x] **Step 2: Append the dry-run tests to `internal/review/review_test.go`**
 
 ```go
 // refuseAsker fails the test if the review calls it.
@@ -242,12 +242,12 @@ func TestDryRunMarkdown(t *testing.T) {
 }
 ```
 
-- [ ] **Step 3: Run the tests to verify they fail**
+- [x] **Step 3: Run the tests to verify they fail**
 
 Run: `go test ./internal/review/ 2>&1 | head -20`
 Expected: compile errors naming `o.DryRun`, `rep.DryRun`, `u.SpecBytes`, and `assignment mismatch: 3 variables but bundle returns 2 values`.
 
-- [ ] **Step 4: Implement in `internal/review/review.go`**
+- [x] **Step 4: Implement in `internal/review/review.go`**
 
 Replace `Options`:
 
@@ -415,12 +415,12 @@ func (r Report) dryRunMarkdown(opts Options) string {
 }
 ```
 
-- [ ] **Step 5: Run the package tests**
+- [x] **Step 5: Run the package tests**
 
 Run: `go test -race ./internal/review/`
 Expected: `ok`.
 
-- [ ] **Step 6: Lint and commit**
+- [x] **Step 6: Lint and commit**
 
 ```bash
 gofmt -l internal/review; go vet ./internal/review/ && golangci-lint run ./internal/review/
