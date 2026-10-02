@@ -952,7 +952,7 @@ Expected: both validations print `Validation passed`.
 
 Load `plugin-dev:skill-development` first. Each file below is complete; write it as given, then have `plugin-dev:skill-reviewer` review the skill and apply its findings only where they keep the prose rule and do not remove content. The reference files are written for an agent: short, imperative, no narrative. `config-schema.md` has a constraint the checker in Task 8 relies on: the only table rows that start with a backticked lowercase name are the rows of the two field tables.
 
-- [ ] **Step 1: Write `SKILL.md`**
+- [x] **Step 1: Write `SKILL.md`**
 
 ```markdown
 ---
@@ -1007,7 +1007,7 @@ A unit at 0 of N with a real test file present is a mis-pairing. Fix the pairing
 - `spec_heading` matches one heading line exactly, `#` characters included.
 ```
 
-- [ ] **Step 2: Write `references/writing-the-spec.md`**
+- [x] **Step 2: Write `references/writing-the-spec.md`**
 
 ```markdown
 # Writing a spec jev review can use
@@ -1092,7 +1092,7 @@ Each requirement sentence maps to one behavior line in the unit that reviews it.
 Source: https://therealbill.github.io/typesafe-go/docs/how-to/write-a-spec-jev-review-can-use/
 ```
 
-- [ ] **Step 3: Write `references/pairing-files.md`**
+- [x] **Step 3: Write `references/pairing-files.md`**
 
 ```markdown
 # Pairing spec sections with files
@@ -1133,7 +1133,7 @@ Sources:
 - https://therealbill.github.io/typesafe-go/docs/explanation/what-jev-review-measures/
 ```
 
-- [ ] **Step 4: Write `references/writing-behaviors.md`**
+- [x] **Step 4: Write `references/writing-behaviors.md`**
 
 ```markdown
 # Writing behaviors
@@ -1193,7 +1193,7 @@ Behaviors:
 Source: https://therealbill.github.io/typesafe-go/docs/how-to/review-your-codebase-with-jev/
 ```
 
-- [ ] **Step 5: Write `references/config-schema.md`**
+- [x] **Step 5: Write `references/config-schema.md`**
 
 ```markdown
 # jev-review.json
@@ -1269,7 +1269,7 @@ Flags: `--only NAME`, `--json`, `--report PATH`, `--min-cover 0.6`, `--max-contr
 Source: https://therealbill.github.io/typesafe-go/docs/reference/jev-review/
 ```
 
-- [ ] **Step 6: Write `references/language-conventions.md`**
+- [x] **Step 6: Write `references/language-conventions.md`**
 
 ```markdown
 # Language conventions for pairing
@@ -1318,7 +1318,7 @@ Where tests live and how to find definitions and references, per language. Use w
 Apply the "Any language" commands with the test naming the repository uses.
 ```
 
-- [ ] **Step 7: Review, validate, commit**
+- [x] **Step 7: Review, validate, commit**
 
 Dispatch `plugin-dev:skill-reviewer` on `plugins/jev-review/skills/setting-up-jev-review/` and apply findings that keep the prose rule and the content. Then:
 
