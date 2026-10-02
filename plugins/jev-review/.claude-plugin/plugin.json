@@ -1,0 +1,12 @@
+{
+  "name": "jev-review",
+  "version": "0.1.0",
+  "description": "Write the spec and jev-review.json that jev review needs, from your codebase.",
+  "author": {
+    "name": "Bill"
+  },
+  "homepage": "https://therealbill.github.io/typesafe-go/docs/how-to/build-a-jev-review-config-with-claude-code/",
+  "repository": "https://github.com/therealbill/typesafe-go",
+  "license": "BSD-3-Clause",
+  "keywords": ["jev", "typesafe", "review", "spec", "tests"]
+}

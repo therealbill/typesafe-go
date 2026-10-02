@@ -838,7 +838,7 @@ Expected: `checkdocs.sh` prints nothing; the grep exits 1 (no matches).
 
 Load `plugin-dev:plugin-structure` before starting. `claude plugin validate` is on this machine; `claude plugin validate .` from the repository root validates the marketplace manifest and `claude plugin validate --strict plugins/jev-review` validates the plugin. `--strict` turns warnings into errors, and the manifests below carry the fields that avoid every warning (marketplace `description`, plugin `author`).
 
-- [ ] **Step 1: Write `.claude-plugin/marketplace.json`**
+- [x] **Step 1: Write `.claude-plugin/marketplace.json`**
 
 ```json
 {
@@ -859,7 +859,7 @@ Load `plugin-dev:plugin-structure` before starting. `claude plugin validate` is 
 }
 ```
 
-- [ ] **Step 2: Write `plugins/jev-review/.claude-plugin/plugin.json`**
+- [x] **Step 2: Write `plugins/jev-review/.claude-plugin/plugin.json`**
 
 ```json
 {
@@ -876,7 +876,7 @@ Load `plugin-dev:plugin-structure` before starting. `claude plugin validate` is 
 }
 ```
 
-- [ ] **Step 3: Write `plugins/jev-review/README.md`**
+- [x] **Step 3: Write `plugins/jev-review/README.md`**
 
 ```markdown
 # jev-review
@@ -932,7 +932,7 @@ The skill `setting-up-jev-review` also activates on its own when you ask about `
 - [jev review reference](https://therealbill.github.io/typesafe-go/docs/reference/jev-review/)
 ```
 
-- [ ] **Step 4: Validate and commit**
+- [x] **Step 4: Validate and commit**
 
 ```bash
 claude plugin validate --strict . && claude plugin validate --strict plugins/jev-review

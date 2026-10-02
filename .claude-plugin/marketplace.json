@@ -1,0 +1,16 @@
+{
+  "name": "typesafe-go",
+  "description": "Claude Code plugins for the typesafe-go SDK and the jev command-line tool.",
+  "owner": {
+    "name": "Bill"
+  },
+  "plugins": [
+    {
+      "name": "jev-review",
+      "source": "./plugins/jev-review",
+      "description": "Write the spec and jev-review.json that jev review needs, from your codebase.",
+      "version": "0.1.0",
+      "keywords": ["jev", "typesafe", "review", "spec", "tests"]
+    }
+  ]
+}
