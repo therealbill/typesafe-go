@@ -561,3 +561,4 @@ for the full classifier table and error JSON shape.
 
 - [How to review your codebase with jev](../how-to/review-your-codebase-with-jev.md)
 - [What jev review measures](../explanation/what-jev-review-measures.md)
+- [Build a jev review config with Claude Code](../how-to/build-a-jev-review-config-with-claude-code.md)

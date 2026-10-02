@@ -160,3 +160,4 @@ The concrete section's `contradicts_spec` reads 0.97, pointing straight at the p
 - [Review your codebase with jev](./review-your-codebase-with-jev.md) for the `jev-review.json` config, flags, and how to respond to a flag.
 - [jev review reference](../reference/jev-review.md) for the full config schema and the section-extraction rule.
 - [What jev review measures](../explanation/what-jev-review-measures.md) for what each question type can and cannot show.
+- [Build a jev review config with Claude Code](./build-a-jev-review-config-with-claude-code.md) for having the `jev-review` plugin write the spec and config.

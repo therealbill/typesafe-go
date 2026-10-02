@@ -295,3 +295,4 @@ behavior or question that crossed its threshold.
 - [What Jev Review Measures](../explanation/what-jev-review-measures.md) for why the thresholds sit where they do and what drift means.
 - [Act on probabilities and confidence](./act-on-probabilities-and-confidence.md) for reading `Noul`/`Score` answers in general, including the drift that shows up in `contradicts_spec` and `thoroughness`.
 - [Cut a release](./cut-a-release.md), which runs a review before tagging.
+- [Build a jev review config with Claude Code](./build-a-jev-review-config-with-claude-code.md) for having the `jev-review` plugin write the spec and config.

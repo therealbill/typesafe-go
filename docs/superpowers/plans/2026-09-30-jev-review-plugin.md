@@ -1815,7 +1815,7 @@ Expected: `checkdocs.sh` prints nothing, `make docs` passes, the grep exits 1.
 
 **Agent:** lead (after Tasks 3, 8, and 9)
 
-- [ ] **Step 1: Gate**
+- [x] **Step 1: Gate**
 
 ```bash
 make lint && make test && make build && make plugin && make docs && git status --short && echo "(clean)"
@@ -1825,7 +1825,7 @@ claude plugin validate --strict . && claude plugin validate --strict plugins/jev
 ```
 Expected: every target passes; the tree is clean; eight `ok` rows and exit 0; `jq` prints `true`; both validations pass.
 
-- [ ] **Step 2: Prepare the two interactive runs**
+- [x] **Step 2: Prepare the two interactive runs**
 
 The checkpoint in `/jev-review:setup` needs a person, so the end-to-end runs happen in the user's own Claude Code session. Prepare both targets:
 
@@ -1919,7 +1919,7 @@ Run 2, existing-spec mode (this repository without its config):
 
 For each problem the user reports, edit the plugin file at fault (`commands/setup.md`, `agents/repo-mapper.md`, or a reference), rerun `make plugin` and `claude plugin validate --strict plugins/jev-review`, and commit with an explicit path. Reinstalling picks up the change: `/plugin uninstall jev-review@typesafe-go` then `/plugin install jev-review@typesafe-go`.
 
-- [ ] **Step 4: Tick the plan, commit, push, watch the site deploy**
+- [x] **Step 4: Tick the plan, commit, push, watch the site deploy**
 
 ```bash
 git add docs/superpowers/plans/2026-09-30-jev-review-plugin.md
@@ -1931,6 +1931,6 @@ curl -fsS https://therealbill.github.io/typesafe-go/docs/how-to/build-a-jev-revi
 ```
 Expected: `ci` passes with the `make plugin` step; the site deploys; the new page's title prints.
 
-- [ ] **Step 5: Report**
+- [x] **Step 5: Report**
 
 Task numbers, commit hashes, the gate tail, the interactive-run results, and any deviation from the spec. Then ask the user whether to cut a release, since `go install ...@latest` and the release binaries carry `--dry-run` only after one: `make release VERSION=v0.2.0`, following [Cut a release](../../how-to/cut-a-release.md). Cutting it is the user's call.
