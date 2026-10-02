@@ -1460,7 +1460,7 @@ git -c user.email=ucntcme@gmail.com -c user.name="Bill Anderson" commit -m "Add 
 
 Load `plugin-dev:command-development` first. `$1` and `$2` are the positional arguments.
 
-- [ ] **Step 1: Write `plugins/jev-review/commands/setup.md`**
+- [x] **Step 1: Write `plugins/jev-review/commands/setup.md`**
 
 ```markdown
 ---
@@ -1568,7 +1568,7 @@ Print:
 Do not run the paid review.
 ```
 
-- [ ] **Step 2: Validate and commit**
+- [x] **Step 2: Validate and commit**
 
 ```bash
 claude plugin validate --strict plugins/jev-review
