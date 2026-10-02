@@ -125,7 +125,50 @@ Bad:
 - "Retries work correctly": nothing specific to assert.
 - "The code handles errors well": no concrete outcome named.
 
-### 5. Run `jev review`
+### 5. Check the config with `--dry-run`
+
+`jev review --dry-run` loads the config, extracts every unit's spec section, and reads and bundles every listed file, then stops before the API call. It needs no API key and sends nothing. A heading that does not match a line in the spec, or a file that does not exist, shows up here instead of in a paid run.
+
+```
+$ jev review --dry-run
+review: checked 2 units
+# jev review --dry-run
+
+budget: 50000 bytes each for implementation and tests
+
+| Unit | Spec bytes | Implementation bytes | Tests bytes | Truncated | Status |
+|---|---|---|---|---|---|
+| retry | 186 | 269 | 282 | no | ok |
+| validation | 0 | 0 | 0 | no | error |
+
+## validation
+
+error: heading "## Validating" not found in spec
+
+review: 1 of 2 units failing
+exit 8
+```
+
+Fix the heading text in the config or the spec and rerun until the exit code is 0:
+
+```
+$ jev review --dry-run
+review: checked 2 units
+# jev review --dry-run
+
+budget: 50000 bytes each for implementation and tests
+
+| Unit | Spec bytes | Implementation bytes | Tests bytes | Truncated | Status |
+|---|---|---|---|---|---|
+| retry | 186 | 269 | 282 | no | ok |
+| validation | 132 | 227 | 176 | no | ok |
+
+exit 0
+```
+
+Each row shows the extracted section's size and each bundle's size before truncation, against the budget line above the table. A `yes` under Truncated means the bundle was cut; split the unit or raise `--max-state-bytes`.
+
+### 6. Run `jev review`
 
 A two-unit project with a retry policy and a validation rule, where the tests don't yet cover two of the five listed behaviors:
 
@@ -154,11 +197,11 @@ $ echo $?
 8
 ```
 
-### 6. Read the table and the flagged lines
+### 7. Read the table and the flagged lines
 
 "Behaviors covered" counts behaviors whose coverage probability is at or above `--min-cover` (default 0.6). "Contradicts" is the contradiction probability, flagged above `--max-contradict` (default 0.4). "Thoroughness" is the score with its confidence in parentheses, flagged below `--min-thorough` (default 2.0). Below the table, each flagged unit gets its own section naming the exact behavior or question that crossed a threshold.
 
-### 7. Decide how to respond to each flag
+### 8. Decide how to respond to each flag
 
 For each flag, choose one of three responses.
 
@@ -197,7 +240,7 @@ $ echo $?
 
 An acceptance always names the behavior's exact text. `jev review` rejects a `covers_NN`-shaped acceptance at load time, with an error explaining that renumbering the behaviors list would otherwise silently move the acceptance to a different claim.
 
-### 8. Iterate on one unit with `--only`
+### 9. Iterate on one unit with `--only`
 
 ```
 jev review --only retry
@@ -205,7 +248,7 @@ jev review --only retry
 
 This reruns a single named unit instead of the whole config, useful while you work through that unit's flags.
 
-### 9. Calibrate thresholds against your own drift
+### 10. Calibrate thresholds against your own drift
 
 `--min-cover`, `--max-contradict`, and `--min-thorough` all carry defaults, but none of them has a universally correct value. The right value is one calibrated against your own repeated runs on unchanged code. Watch a few runs of your own suite before changing any of them. See [What Jev Review Measures](../explanation/what-jev-review-measures.md) for why the defaults sit where they do.
 
@@ -217,7 +260,7 @@ A clean run exits 0:
 jev review; echo $?
 ```
 
-`jev review` also writes a JSON report, default path `jev-review-report.json` (add it to `.gitignore`), holding the same data as the Markdown table, one object per unit. `jev review --only retry --json` on the fixed scratch example from step 7:
+`jev review` also writes a JSON report, default path `jev-review-report.json` (add it to `.gitignore`), holding the same data as the Markdown table, one object per unit. `jev review --only retry --json` on the fixed scratch example from step 8:
 
 ```json
 [

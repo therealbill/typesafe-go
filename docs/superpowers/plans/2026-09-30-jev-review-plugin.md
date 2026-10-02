@@ -609,7 +609,7 @@ git -c user.email=ucntcme@gmail.com -c user.name="Bill Anderson" commit -m "Add 
 
 Every transcript on these pages is real output from `./bin/jev` built from Task 2. Follow the prose rule in "Rules for every agent".
 
-- [ ] **Step 1: Build a scratch project for the transcripts**
+- [x] **Step 1: Build a scratch project for the transcripts**
 
 Create `$SCRATCH/dryrun-demo/` with these files.
 
@@ -742,7 +742,7 @@ cat $SCRATCH/dryrun-ok.txt $SCRATCH/dryrun-bad.txt
 ```
 Expected: the first run prints two `ok` rows and `exit 0`; the second prints an `error` row for `validation`, a `## validation` section with `error: heading "## Validating" not found in spec`, `review: 1 of 2 units failing` on stderr, and `exit 8`.
 
-- [ ] **Step 2: Edit `docs/reference/jev-review.md`**
+- [x] **Step 2: Edit `docs/reference/jev-review.md`**
 
 Make these changes, in this order:
 
@@ -794,11 +794,11 @@ Then add, after the table: "In a dry run, `request_id`, `model`, `input_tokens`,
 
 6. In `## Exit codes`, after the table, add: "With `--dry-run`, only 0, 1, and 8 occur; see [`jev review --dry-run`](#jev-review---dry-run)."
 
-- [ ] **Step 3: Edit `docs/reference/jev-cli.md`**
+- [x] **Step 3: Edit `docs/reference/jev-cli.md`**
 
 Replace the fenced `./bin/jev review --help` block under `## jev review` with the contents of `$SCRATCH/review-help.txt`. In the paragraph that follows it, after the sentence about `jev review init`, add: "`jev review --dry-run` checks the config, spec headings, and files without building a client, so it needs no API key; its table and exit codes are on the [jev review reference](./jev-review.md#jev-review---dry-run)."
 
-- [ ] **Step 4: Edit `docs/how-to/review-your-codebase-with-jev.md`**
+- [x] **Step 4: Edit `docs/how-to/review-your-codebase-with-jev.md`**
 
 Insert a new step after `### 4. Write behaviors as concrete, testable claims` and renumber the later steps 5 through 9 to 6 through 10, including the sentence in "Verify it works" that says "on the fixed scratch example from step 7" (it becomes step 8). Then run `grep -rn 'review-your-codebase-with-jev.md#' docs README.md` and fix any link whose anchor number changed; at the time of writing the only anchor link is to step 3, which does not move.
 
@@ -818,7 +818,7 @@ Fix the heading text in the config or the spec and rerun until the exit code is 
 Each row shows the extracted section's size and each bundle's size before truncation, against the budget line above the table. A `yes` under Truncated means the bundle was cut; split the unit or raise `--max-state-bytes`.
 ```
 
-- [ ] **Step 5: Check and commit**
+- [x] **Step 5: Check and commit**
 
 ```bash
 ./tools/checkdocs.sh && grep -nE "—|it's worth|this matters|deliberately" docs/reference/jev-review.md docs/reference/jev-cli.md docs/how-to/review-your-codebase-with-jev.md; echo "grep exit $?"

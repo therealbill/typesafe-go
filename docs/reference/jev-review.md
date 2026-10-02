@@ -19,8 +19,8 @@ Binary: `jev` (built at `./bin/jev`). Source: `internal/review` and
 
 ```
 jev review [--units jev-review.json] [--only NAME] [--report jev-review-report.json]
-           [--json] [--min-cover 0.6] [--max-contradict 0.4] [--min-thorough 2]
-           [--max-state-bytes 100000] [--unit-timeout 2m]
+           [--json] [--dry-run] [--min-cover 0.6] [--max-contradict 0.4]
+           [--min-thorough 2] [--max-state-bytes 100000] [--unit-timeout 2m]
 jev review init [--units jev-review.json]
 ```
 
@@ -51,6 +51,7 @@ Available Commands:
   init        Write a starter jev-review.json
 
 Flags:
+      --dry-run                 check the config, spec headings, and files without calling the API
   -h, --help                    help for review
       --json                    print the report JSON on stdout instead of the Markdown summary
       --max-contradict float    flag a unit whose contradiction probability is above this (default 0.4)
@@ -80,6 +81,7 @@ Use "jev review [command] --help" for more information about a command.
 
 | Flag | Type | Default | Description |
 |---|---|---|---|
+| `--dry-run` | bool | `false` | check the config, spec headings, and files without calling the API |
 | `--json` | bool | `false` | print the report JSON on stdout instead of the Markdown summary |
 | `--max-contradict` | float | `0.4` | flag a unit whose contradiction probability is above this |
 | `--max-state-bytes` | int | `100000` | byte cap for implementation and tests together |
@@ -149,6 +151,78 @@ jev: jev-review.json already exists; remove it or pass --units
 $ echo $?
 1
 ```
+
+## `jev review --dry-run`
+
+Source: `internal/cli/review.go`, `runDryRun`, and `internal/review/review.go`, `runUnit`.
+
+With `--dry-run`, `jev review` loads the config, then for each unit reads its
+spec document, extracts the section named by `spec_heading`, reads every
+`implementation` and `tests` file, and builds both bundles. It stops there. No
+client is built, no request is sent, and no API key is needed. `--report` is
+ignored and no report file is written. `--only` and `--json` work as they do
+without `--dry-run`. The global flags are accepted and unused.
+
+The Markdown summary is a different table from the one a full run prints:
+
+| Column | Content |
+|---|---|
+| Unit | The unit's `name`. |
+| Spec bytes | Length of the extracted section. |
+| Implementation bytes | Size of the implementation bundle before truncation. |
+| Tests bytes | Size of the tests bundle before truncation. |
+| Truncated | `yes` when either bundle was cut to fit half of `--max-state-bytes`. |
+| Status | `ok`, or `error` when the spec document, heading, or a file could not be read. |
+
+A `budget:` line above the table states the per-bundle limit. Below the table,
+each errored unit gets a `## <unit>` section with `error: <message>`, and each
+truncated unit gets one with `note: sources were truncated to fit the state
+budget`.
+
+Verified against the built binary, on a two-unit scratch project:
+
+```
+$ jev review --dry-run
+review: checked 2 units
+# jev review --dry-run
+
+budget: 50000 bytes each for implementation and tests
+
+| Unit | Spec bytes | Implementation bytes | Tests bytes | Truncated | Status |
+|---|---|---|---|---|---|
+| retry | 186 | 269 | 282 | no | ok |
+| validation | 132 | 227 | 176 | no | ok |
+
+exit 0
+```
+
+The same config with the second unit's heading changed to `## Validating`,
+which does not appear in the spec:
+
+```
+$ jev review --dry-run
+review: checked 2 units
+# jev review --dry-run
+
+budget: 50000 bytes each for implementation and tests
+
+| Unit | Spec bytes | Implementation bytes | Tests bytes | Truncated | Status |
+|---|---|---|---|---|---|
+| retry | 186 | 269 | 282 | no | ok |
+| validation | 0 | 0 | 0 | no | error |
+
+## validation
+
+error: heading "## Validating" not found in spec
+
+review: 1 of 2 units failing
+exit 8
+```
+
+Exit codes with `--dry-run`: 0 when every unit resolved, 8 when any unit
+errored (`kind` `flagged`, with `review: k of n units failing` on stderr), 1
+when the config is missing or invalid or `--only` matched nothing. Codes 3 to
+7 cannot occur.
 
 ## Config schema (`jev-review.json`)
 
@@ -317,22 +391,28 @@ type BehaviorResult struct {
     Covered  float64 `json:"covered"`
 }
 type UnitReport struct {
-    Name             string           `json:"name"`
-    RequestID        string           `json:"request_id,omitempty"`
-    Model            string           `json:"model,omitempty"`
-    InputTokens      int              `json:"input_tokens,omitempty"`
-    Truncated        bool             `json:"truncated"`
-    Behaviors        []BehaviorResult `json:"behaviors"`
-    Contradicts      float64          `json:"contradicts_spec"`
-    Thoroughness     float64          `json:"thoroughness"`
-    ThoroughConf     float64          `json:"thoroughness_confidence"`
-    Weakest          string           `json:"weakest_area"`
-    WeakestConf      float64          `json:"weakest_confidence"`
-    Flags            []string         `json:"flags"`
-    Notes            []string         `json:"notes,omitempty"`
-    StaleAcceptances []string         `json:"stale_acceptances,omitempty"`
-    Failing          bool             `json:"failing"`
-    Error            string           `json:"error,omitempty"`
+    Name        string `json:"name"`
+    RequestID   string `json:"request_id,omitempty"`
+    Model       string `json:"model,omitempty"`
+    InputTokens int    `json:"input_tokens,omitempty"`
+    Truncated   bool   `json:"truncated"`
+    // SpecBytes is the length of the extracted spec section.
+    // ImplementationBytes and TestsBytes are the bundle sizes before
+    // truncation, so a report shows how close a unit sits to the budget.
+    SpecBytes           int              `json:"spec_bytes,omitempty"`
+    ImplementationBytes int              `json:"implementation_bytes,omitempty"`
+    TestsBytes          int              `json:"tests_bytes,omitempty"`
+    Behaviors           []BehaviorResult `json:"behaviors"`
+    Contradicts         float64          `json:"contradicts_spec"`
+    Thoroughness        float64          `json:"thoroughness"`
+    ThoroughConf        float64          `json:"thoroughness_confidence"`
+    Weakest             string           `json:"weakest_area"`
+    WeakestConf         float64          `json:"weakest_confidence"`
+    Flags               []string         `json:"flags"`
+    Notes               []string         `json:"notes,omitempty"`
+    StaleAcceptances    []string         `json:"stale_acceptances,omitempty"`
+    Failing             bool             `json:"failing"`
+    Error               string           `json:"error,omitempty"`
 }
 ```
 
@@ -343,6 +423,9 @@ type UnitReport struct {
 | `model` | string | omitempty | The model used for this unit's call. |
 | `input_tokens` | int | omitempty | Input token count for this unit's call. |
 | `truncated` | bool | Always | Whether `implementation` or `tests` was cut to fit `--max-state-bytes`. |
+| `spec_bytes` | int | omitempty | Length in bytes of the extracted spec section. |
+| `implementation_bytes` | int | omitempty | Size in bytes of the implementation bundle before truncation. |
+| `tests_bytes` | int | omitempty | Size in bytes of the tests bundle before truncation; absent when `tests` is empty. |
 | `behaviors` | array of `{id, behavior, covered}` | Always | One entry per `behaviors` entry in the config, `id` being its `covers_NN` question id and `covered` its answered probability. |
 | `contradicts_spec` | float64 | Always | The `contradicts_spec` answer's probability. |
 | `thoroughness` | float64 | Always | The `thoroughness` answer's score. |
@@ -354,6 +437,10 @@ type UnitReport struct {
 | `stale_acceptances` | array of string | omitempty | Entries from the unit's `accepted` list whose corresponding flag did not fire on this run, sorted. |
 | `failing` | bool | Always | `true` when at least one unaccepted flag fired, or the unit errored (missing or unreadable spec document, missing implementation or test file, missing spec heading, API/transport failure, or the unit call exceeding `--unit-timeout`). |
 | `error` | string | omitempty | Set instead of most other fields when the unit could not complete. |
+
+In a dry run, `request_id`, `model`, `input_tokens`, `behaviors`, and the
+answer fields are absent or zero and `flags` is `null`; the three byte fields,
+`truncated`, `notes`, `failing`, and `error` are set as in a full run.
 
 A unit error, of any of the kinds listed above, ends only that unit. `Run`
 records it on that unit's `UnitReport` and continues with the remaining
@@ -459,6 +546,9 @@ failure) `review: <k> of <n> units failing` before the process exits 8.
 | 1 | config missing or invalid, report not writable, zero units matched `--only`, or bad flags (`kind` `usage`) |
 | 3–7 | a unit's API call failed with an unrecoverable error, classified the same as `jev ask` (see the [errors and exit codes reference](./errors-and-exit-codes.md)); the report still lists that unit with its `error` field set |
 | 8 | at least one unit is failing: an unaccepted flag fired, a file or spec heading was missing, or the unit timed out (`kind` `flagged`); the report says which |
+
+With `--dry-run`, only 0, 1, and 8 occur; see
+[`jev review --dry-run`](#jev-review---dry-run).
 
 The process exit code is the classifier's code for the first unit call error
 if any occurred, otherwise 8 if any unit is failing for any other reason,

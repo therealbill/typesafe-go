@@ -341,6 +341,7 @@ Available Commands:
   init        Write a starter jev-review.json
 
 Flags:
+      --dry-run                 check the config, spec headings, and files without calling the API
   -h, --help                    help for review
       --json                    print the report JSON on stdout instead of the Markdown summary
       --max-contradict float    flag a unit whose contradiction probability is above this (default 0.4)
@@ -368,7 +369,10 @@ Use "jev review [command] --help" for more information about a command.
 
 `jev review` and `jev review init` build the client from the same global
 flags as every other subcommand. `jev review init` writes a starter
-`jev-review.json` and refuses to overwrite an existing file. The config
+`jev-review.json` and refuses to overwrite an existing file.
+`jev review --dry-run` checks the config, spec headings, and files without
+building a client, so it needs no API key; its table and exit codes are on
+the [jev review reference](./jev-review.md#jev-review---dry-run). The config
 schema, the four questions sent to Jev per unit, the JSON report shape, the
 Markdown summary, default thresholds, and exit code 8 are documented in full
 on the [jev review reference](./jev-review.md).
