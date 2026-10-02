@@ -440,7 +440,7 @@ Expected: `gofmt -l` prints nothing; lint passes.
 
 Read `internal/cli/review.go` and `internal/cli/review_test.go` first. The `run` helper in `internal/cli/cli_test.go` clears `TYPESAFE_API_KEY`, so a test that passes no `--api-key` proves the dry run needs no key.
 
-- [ ] **Step 1: Append the tests to `internal/cli/review_test.go`**
+- [x] **Step 1: Append the tests to `internal/cli/review_test.go`**
 
 Add `"errors"` to the import block, then append:
 
@@ -508,12 +508,12 @@ func TestReviewDryRunOnlyNoMatchIsUsage(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `go test ./internal/cli/ -run DryRun 2>&1 | head`
 Expected: each test fails with `unknown flag: --dry-run` in the output (exit 1, not the expected code).
 
-- [ ] **Step 3: Implement in `internal/cli/review.go`**
+- [x] **Step 3: Implement in `internal/cli/review.go`**
 
 Add `"context"` to the import block. After the `--unit-timeout` flag line in `newReviewCmd`, add:
 
@@ -575,12 +575,12 @@ func flagged(streams IO, rep review.Report) error {
 }
 ```
 
-- [ ] **Step 4: Run the CLI tests**
+- [x] **Step 4: Run the CLI tests**
 
 Run: `go test -race ./internal/cli/`
 Expected: `ok`.
 
-- [ ] **Step 5: Build and check the binary by hand**
+- [x] **Step 5: Build and check the binary by hand**
 
 ```bash
 make build
@@ -590,7 +590,7 @@ ls jev-review-report.json 2>/dev/null || echo "no report file"
 ```
 Expected: a table with eight `ok` rows and exit 0; the JSON parses with non-zero sizes; no report file was written by the dry run (delete a stale one from an earlier real run first: `rm -f jev-review-report.json`).
 
-- [ ] **Step 6: Lint and commit**
+- [x] **Step 6: Lint and commit**
 
 ```bash
 make lint

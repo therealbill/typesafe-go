@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -50,6 +51,7 @@ Start with: jev review init`,
 	f.Float64Var(&o.opts.MinThorough, "min-thorough", o.opts.MinThorough, "flag a unit whose thoroughness score is below this")
 	f.IntVar(&o.opts.MaxStateBytes, "max-state-bytes", o.opts.MaxStateBytes, "byte cap for implementation and tests together")
 	f.DurationVar(&o.opts.UnitTimeout, "unit-timeout", o.opts.UnitTimeout, "time allowed for one unit's call")
+	f.BoolVar(&o.opts.DryRun, "dry-run", false, "check the config, spec headings, and files without calling the API")
 	cmd.AddCommand(newReviewInitCmd(streams))
 	return cmd
 }
@@ -79,6 +81,9 @@ func runReview(cmd *cobra.Command, g *globals, o *reviewOptions, streams IO, get
 	cfg, base, err := review.Load(o.units)
 	if err != nil {
 		return fail(streams, g.pretty, &usageError{err})
+	}
+	if o.opts.DryRun {
+		return runDryRun(cmd.Context(), cfg, base, o, streams, g.pretty)
 	}
 	changed := cmd.Flags().Changed
 	if err := g.validateFlags(changed); err != nil {
@@ -115,14 +120,43 @@ func runReview(cmd *cobra.Command, g *globals, o *reviewOptions, streams IO, get
 		_, _ = fmt.Fprint(streams.Out, rep.Markdown(o.opts))
 	}
 	if rep.Failing() {
-		failing := 0
-		for _, u := range rep.Units {
-			if u.Failing {
-				failing++
-			}
-		}
-		_, _ = fmt.Fprintf(streams.Err, "review: %d of %d units failing\n", failing, len(rep.Units))
-		return &ExitError{Code: ExitFlagged, Kind: "flagged", Err: errors.New("review flagged at least one unit")}
+		return flagged(streams, rep)
 	}
 	return nil
+}
+
+// runDryRun checks every unit up to the API call and prints the result. It
+// builds no client, so no API key is needed, and it writes no report file.
+func runDryRun(ctx context.Context, cfg *review.Config, base string, o *reviewOptions, streams IO, pretty bool) error {
+	rep, err := review.Run(ctx, cfg, base, nil, o.opts)
+	if err != nil {
+		return fail(streams, pretty, &usageError{err})
+	}
+	_, _ = fmt.Fprintf(streams.Err, "review: checked %d units\n", len(rep.Units))
+	if o.json {
+		out, err := rep.JSON()
+		if err != nil {
+			return fail(streams, pretty, err)
+		}
+		_, _ = streams.Out.Write(out)
+		_, _ = fmt.Fprintln(streams.Out)
+	} else {
+		_, _ = fmt.Fprint(streams.Out, rep.Markdown(o.opts))
+	}
+	if rep.Failing() {
+		return flagged(streams, rep)
+	}
+	return nil
+}
+
+// flagged prints the failing count and returns the exit-8 error.
+func flagged(streams IO, rep review.Report) error {
+	failing := 0
+	for _, u := range rep.Units {
+		if u.Failing {
+			failing++
+		}
+	}
+	_, _ = fmt.Fprintf(streams.Err, "review: %d of %d units failing\n", failing, len(rep.Units))
+	return &ExitError{Code: ExitFlagged, Kind: "flagged", Err: errors.New("review flagged at least one unit")}
 }

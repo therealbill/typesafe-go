@@ -2,6 +2,7 @@ package cli
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -156,5 +157,67 @@ func TestReviewAPIErrorClassified(t *testing.T) {
 	b, err := os.ReadFile(report)
 	if err != nil || !strings.Contains(string(b), `"error"`) {
 		t.Fatalf("report must still be written with the unit error: %v %s", err, b)
+	}
+}
+
+func TestReviewDryRunNeedsNoKeyAndWritesNoReport(t *testing.T) {
+	cfg, report := reviewRepo(t)
+	code, out, errOut := run(t, "", "review", "--dry-run", "--units", cfg, "--report", report)
+	if code != ExitOK {
+		t.Fatalf("exit %d stdout %s stderr %s", code, out, errOut)
+	}
+	// spec section "## Retry\n\nretry text\n" is 21 bytes; retry.go is
+	// "package x\n" (10 bytes) so its bundle is 18+10+2; the test bundle is 23+10+2.
+	for _, want := range []string{"# jev review --dry-run", "budget: 50000 bytes", "| retry | 21 | 30 | 35 | no | ok |"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("missing %q in stdout:\n%s", want, out)
+		}
+	}
+	if !strings.Contains(errOut, "review: checked 1 units") {
+		t.Fatalf("stderr %q", errOut)
+	}
+	if _, err := os.Stat(report); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("a dry run must not write the report file: %v", err)
+	}
+}
+
+func TestReviewDryRunMissingHeadingExits8(t *testing.T) {
+	cfg, report := reviewRepo(t)
+	bad := `{"spec":"spec.md","units":[{"name":"retry","spec_heading":"## Nope","implementation":["retry.go"],"tests":["retry_test.go"],"behaviors":["b0"]}]}`
+	if err := os.WriteFile(cfg, []byte(bad), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	code, out, errOut := run(t, "", "review", "--dry-run", "--units", cfg, "--report", report)
+	if code != ExitFlagged {
+		t.Fatalf("exit %d stdout %s stderr %s", code, out, errOut)
+	}
+	if !strings.Contains(out, "| retry | 0 | 0 | 0 | no | error |") || !strings.Contains(out, `error: heading "## Nope" not found in spec`) {
+		t.Fatalf("stdout:\n%s", out)
+	}
+	if !strings.Contains(errOut, "review: 1 of 1 units failing") {
+		t.Fatalf("stderr %q", errOut)
+	}
+}
+
+func TestReviewDryRunJSON(t *testing.T) {
+	cfg, report := reviewRepo(t)
+	code, out, _ := run(t, "", "review", "--dry-run", "--json", "--units", cfg, "--report", report)
+	var units []map[string]any
+	if code != ExitOK || json.Unmarshal([]byte(out), &units) != nil || len(units) != 1 {
+		t.Fatalf("exit %d out %s", code, out)
+	}
+	if units[0]["spec_bytes"] != 21.0 || units[0]["implementation_bytes"] != 30.0 || units[0]["tests_bytes"] != 35.0 {
+		t.Fatalf("sizes missing: %v", units[0])
+	}
+	if _, ok := units[0]["request_id"]; ok {
+		t.Fatalf("no request happens in a dry run: %v", units[0])
+	}
+}
+
+func TestReviewDryRunOnlyNoMatchIsUsage(t *testing.T) {
+	cfg, report := reviewRepo(t)
+	code, out, _ := run(t, "", "review", "--dry-run", "--only", "nope", "--units", cfg, "--report", report)
+	if code != ExitUsage || !strings.Contains(out, "no units matched") {
+		t.Fatalf("exit %d out %s", code, out)
 	}
 }
