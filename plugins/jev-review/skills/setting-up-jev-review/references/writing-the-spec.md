@@ -52,7 +52,7 @@ Concrete: "Retries are attempted up to MaxRetries (default 2) on 408, 429, and 5
 ## Three routes to a spec
 
 - From READMEs or design docs: rewrite each claim as a declarative. "Handles errors gracefully" becomes which errors and what happens to them.
-- From code and tests: write down what the code does as declaratives and mark anything that looks wrong. After a full run, a `contradicts_spec` flag on such a section means the sentence describes what the code does today and that differs from what it should do.
+- From code and tests: write down what the code does as declaratives and mark anything that looks wrong. After a full run, a `contradicts_spec` flag on such a section means a sentence does not match what the code does, so the reading of the code was wrong there. Reread the code at that point and decide whether the sentence or the code is the one to change.
 - From a design spec written before the code: a contradiction found here is a real candidate for a bug or a stale requirement.
 
 ## New-spec skeleton
