@@ -1342,7 +1342,7 @@ Expected: SKILL.md is under 120 lines; validation passes; the grep exits 1.
 
 Load `plugin-dev:agent-development` first. The agent reads only. Its final message ends with one fenced JSON block whose shape the command in Task 7 parses.
 
-- [ ] **Step 1: Write `plugins/jev-review/agents/repo-mapper.md`**
+- [x] **Step 1: Write `plugins/jev-review/agents/repo-mapper.md`**
 
 ```markdown
 ---
@@ -1440,7 +1440,7 @@ End your reply with exactly one fenced `json` block in this shape, then a summar
 - Prefer fewer, well-evidenced units over many weak ones. Leave out a section with no code behind it and list it in `unmatched_headings`.
 ```
 
-- [ ] **Step 2: Validate and commit**
+- [x] **Step 2: Validate and commit**
 
 ```bash
 claude plugin validate --strict plugins/jev-review
