@@ -1589,7 +1589,7 @@ git -c user.email=ucntcme@gmail.com -c user.name="Bill Anderson" commit -m "Add 
 
 The script is zsh. Consult `shell-scripting-pro` if a zsh construct is in doubt. It parses JSON with `python3`, which is on macOS and on the Ubuntu runner image. It runs `claude plugin validate --strict` only when `claude` is on `PATH`, so CI without Claude Code still passes.
 
-- [ ] **Step 1: Write `tools/checkplugin.sh`**
+- [x] **Step 1: Write `tools/checkplugin.sh`**
 
 ```zsh
 #!/bin/zsh
@@ -1667,7 +1667,7 @@ exit $status
 
 Make it executable: `chmod +x tools/checkplugin.sh`.
 
-- [ ] **Step 2: Add the `plugin` target to `Makefile`**
+- [x] **Step 2: Add the `plugin` target to `Makefile`**
 
 Change the `.PHONY` line to:
 
@@ -1682,7 +1682,7 @@ plugin: ## Check the Claude Code marketplace and plugin files
 	@./tools/checkplugin.sh
 ```
 
-- [ ] **Step 3: Add the CI step**
+- [x] **Step 3: Add the CI step**
 
 In `.github/workflows/ci.yml`, append to the `lint` job's steps, after the golangci-lint step:
 
@@ -1691,7 +1691,7 @@ In `.github/workflows/ci.yml`, append to the `lint` job's steps, after the golan
       - run: make plugin
 ```
 
-- [ ] **Step 4: Run the check, prove it catches drift, restore**
+- [x] **Step 4: Run the check, prove it catches drift, restore**
 
 ```bash
 make plugin; echo "exit $?"
@@ -1703,7 +1703,7 @@ make help | grep plugin
 ```
 Expected: exit 0; then two `checkplugin:` lines (`does not document field notes`, `documents remarks, which is not a field`) and exit 1; then exit 0; `make help` lists `plugin`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add tools/checkplugin.sh Makefile .github/workflows/ci.yml
