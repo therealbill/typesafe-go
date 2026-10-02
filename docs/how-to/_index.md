@@ -21,4 +21,5 @@ so they skip background and go straight to the steps.
 - [Configure logging](configure-logging.md)
 - [Review your codebase with Jev](review-your-codebase-with-jev.md)
 - [How to Write a Spec jev review Can Use](write-a-spec-jev-review-can-use.md)
+- [Build a jev review config with Claude Code](build-a-jev-review-config-with-claude-code.md)
 - [Cut a release](cut-a-release.md)

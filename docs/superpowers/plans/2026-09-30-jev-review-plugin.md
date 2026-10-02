@@ -1722,7 +1722,7 @@ git -c user.email=ucntcme@gmail.com -c user.name="Bill Anderson" commit -m "Add 
 
 Run `make build` first so `./bin/jev` has `--dry-run`. Read `plugins/jev-review/commands/setup.md` and `plugins/jev-review/README.md`; the how-to describes what they do, in the same words for the same things. Follow the prose rule in "Rules for every agent". Every command output on the page is real.
 
-- [ ] **Step 1: Make the transcripts**
+- [x] **Step 1: Make the transcripts**
 
 Create `$SCRATCH/howto-demo/` with the same five source files and `jev-review.json` as Task 3 Step 1 (`spec.md`, `retry.go`, `retry_test.go`, `validation.go`, `validation_test.go`). Run from inside it:
 
@@ -1732,7 +1732,7 @@ Create `$SCRATCH/howto-demo/` with the same five source files and `jev-review.js
 
 Keep the output for the page.
 
-- [ ] **Step 2: Write the how-to** (`diataxis-docs:doc-howto-writer`)
+- [x] **Step 2: Write the how-to** (`diataxis-docs:doc-howto-writer`)
 
 Front matter:
 
@@ -1768,7 +1768,7 @@ Verify it works: `jev review --dry-run; echo $?` prints a table with an `ok` row
 
 See also: the two how-tos above, the [jev review reference](../reference/jev-review.md), and the plugin directory on GitHub, linked as `https://github.com/therealbill/typesafe-go/tree/main/plugins/jev-review` (not a relative path; the plugin is outside the docs mount).
 
-- [ ] **Step 3: Link the page**
+- [x] **Step 3: Link the page**
 
 In `docs/how-to/_index.md`, add after the "How to Write a Spec jev review Can Use" line:
 
@@ -1784,7 +1784,7 @@ A Claude Code plugin writes the spec and `jev-review.json` for you. Add this rep
 
 In the README's "How-to" documentation line, add `[build a jev review config with Claude Code](docs/how-to/build-a-jev-review-config-with-claude-code.md)` after the "review your codebase with jev" entry.
 
-- [ ] **Step 4: Update `docs/reference/makefile-and-repository-layout.md`**
+- [x] **Step 4: Update `docs/reference/makefile-and-repository-layout.md`**
 
 1. Replace the `make help` block with the output of `make help` run now (it gains the `plugin` line after `review`).
 2. In the repository layout table, replace the `tools` row and add two rows after the `.github/workflows` row:
@@ -1797,7 +1797,7 @@ In the README's "How-to" documentation line, add `[build a jev review config wit
 
 3. In the `ci.yml` table, change the `lint` row to end with: "runs `golangci/golangci-lint-action@v8` at `version: v2.5`, installs `zsh` when it is absent, then runs `make plugin`."
 
-- [ ] **Step 5: Validate and commit**
+- [x] **Step 5: Validate and commit**
 
 Run `diataxis-docs:doc-crosslink-validator` on the new page, then:
 

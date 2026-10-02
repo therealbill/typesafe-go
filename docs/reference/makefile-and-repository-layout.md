@@ -19,6 +19,7 @@ $ make help
   release      Tag and push a release: make release VERSION=vX.Y.Z (runs lint and test first)
   integration  Run the live API test (needs TYPESAFE_API_KEY)
   review       Run jev review against this repository (needs TYPESAFE_API_KEY)
+  plugin       Check the Claude Code marketplace and plugin files
   docs         Build the site and check that every docs/ page is reachable and links resolve
   site         Build the documentation site into site/public
   site-serve   Serve the documentation site locally with live reload
@@ -60,12 +61,14 @@ repository root at the time this page was written:
 | `internal/cli` | The `jev` command implementation: `root.go`, `ask.go`, `models.go`, `version.go`, `request.go`, `exit.go`, `output.go`, `telemetry.go`, `review.go`, and their `_test.go` counterparts. |
 | `internal/review` | The review logic behind `jev review`: `review.go`, `template.go`, `review_test.go`. Documented on the [jev review reference](jev-review.md). |
 | `otel` | The `typesafe/otel` package: an `Instrumentation` implementation (`otel.go`) that reports OpenTelemetry traces for client calls, plus `otel_test.go`. |
-| `tools` | `checkdocs.sh`, the documentation link checker `make docs` runs. |
+| `tools` | `checkdocs.sh`, the documentation link checker `make docs` runs, and `checkplugin.sh`, the plugin checker `make plugin` runs. |
 | `jev-review.json` (repository root) | This repository's own `jev review` config. |
 | `testdata` | Fixture JSON files: `models_ok.json`, `request.json`, `systemone_ok.json`. |
 | `docs` | This documentation set: `_index.md` plus `explanation`, `how-to`, `reference`, `superpowers`, and `tutorials` subdirectories. |
 | `site` | The Hugo site that builds `docs/` (present in the repository at the time of writing): `hugo.toml`, `go.mod`, `go.sum`, `content`, `layouts`, `resources`, `public`. |
 | `.github/workflows` | CI/CD workflow definitions: `ci.yml`, `hugo-deploy.yml`, `hugo-pr.yml`, `release.yml`. |
+| `.claude-plugin` | `marketplace.json`, the Claude Code marketplace manifest that lists `plugins/jev-review`. |
+| `plugins/jev-review` | The jev-review Claude Code plugin: `.claude-plugin/plugin.json`, `README.md`, `commands/setup.md`, `agents/repo-mapper.md`, and `skills/setting-up-jev-review/`. Documented on [Build a jev review config with Claude Code](../how-to/build-a-jev-review-config-with-claude-code.md). |
 
 ## GitHub Actions workflows
 
@@ -78,7 +81,7 @@ Triggers on `push` to branch `main`, and on every `pull_request`. Two jobs:
 | Job | Steps |
 |---|---|
 | `test` | Checks out the repository, sets up Go from `go.mod`, runs `go test -race -cover ./...`, then `go run golang.org/x/vuln/cmd/govulncheck@latest ./...`. |
-| `lint` | Checks out the repository, sets up Go from `go.mod`, runs `golangci/golangci-lint-action@v8` at `version: v2.5`. |
+| `lint` | Checks out the repository, sets up Go from `go.mod`, runs `golangci/golangci-lint-action@v8` at `version: v2.5`, installs `zsh` when it is absent, then runs `make plugin`. |
 
 ### `hugo-deploy.yml` (`name: Deploy documentation site`)
 
